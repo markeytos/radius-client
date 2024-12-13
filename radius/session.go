@@ -6,24 +6,71 @@ Define generic RADIUS session
 package radius
 
 import (
+	"crypto/hmac"
+	"crypto/md5"
 	"crypto/rand"
+	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"net"
 	"time"
 )
 
-type Session interface {
-	Status() error
+type baseSession struct {
+	identifier     uint8
+	conn           net.Conn
+	sharedSecret   string
+	timeout        time.Duration
+	retries        int
+	sendAttributes AttributeMap
 }
 
-type baseSession struct {
-	identifier   uint8
-	rounds       int
-	conn         net.Conn
-	sharedSecret string
-	timeout      time.Duration
-	retries      int
+func (s *baseSession) createDatagram(c Code, attrMap AttributeMap) (*Datagram, error) {
+	maps.Copy(attrMap, s.sendAttributes)
+
+	h := &Header{
+		Code:       c,
+		Identifier: s.identifier,
+		Length:     uint16(headerLen),
+	}
+	_, err := rand.Read(h.Authenticator[:])
+	if err != nil {
+		return nil, err
+	}
+
+	attrs, err := serializeRequestAttributes(attrMap, s.sharedSecret, h.Authenticator[:])
+	if err != nil {
+		return nil, err
+	}
+
+	attrs_len := 0
+	for _, a := range attrs {
+		attrs_len += len(a.buffer)
+	}
+	h.Length += uint16(attrs_len)
+
+	d := &Datagram{
+		Header:     h,
+		Attributes: attrs,
+	}
+
+	if _, ok := attrMap[AttributeTypeMessageAuthenticator]; ok {
+		ma := d.FirstAttribute(AttributeTypeMessageAuthenticator)
+		if ma == nil {
+			panic("message authenticator must exist in datagram when constructed")
+		}
+		mac := hmac.New(md5.New, []byte(s.sharedSecret))
+		_, err = d.WriteTo(mac)
+		if err != nil {
+			return nil, err
+		}
+		sum := mac.Sum(nil)
+		copy(ma.Value(), sum)
+	}
+
+	s.identifier++
+	return d, nil
 }
 
 func (s baseSession) sendReceiveDatagram(sd *Datagram) (*Datagram, error) {
@@ -48,13 +95,16 @@ retry:
 	if err != nil {
 		return nil, fmt.Errorf("error setting receive deadline: %w", err)
 	}
-	r, err := CreateDatagramFromReader(conn)
+	r, err := DeserializeDatagramFromReader(conn)
 	if err != nil {
 		attempts++
 		if attempts > s.retries {
 			goto retry
 		}
 		return nil, fmt.Errorf("error receiving datagram: %w", err)
+	}
+	if !r.ValidResponseAuthenticatorAndMessageAuthenticator(sd.Header.Authenticator, s.sharedSecret) {
+		return nil, errors.New("invalid response authenticators")
 	}
 	return r, nil
 }

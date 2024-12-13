@@ -12,16 +12,27 @@ Define RADIUS attributes of the following format
 package radius
 
 import (
+	"crypto/md5"
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
+	"strconv"
 )
+
+const (
+	maxAttributeLen = 255 - 2
+)
+
+type AttributeMap map[AttributeType]string
 
 type Attribute struct {
 	buffer []byte
 }
 
-func createAttribute(t AttributeType, len int) (*Attribute, error) {
-	if len > 255-2 {
+func newEmptyAttribute(t AttributeType, len int) (*Attribute, error) {
+	if len > maxAttributeLen {
 		return nil, errors.New("length of value of attribute too big")
 	}
 
@@ -32,6 +43,162 @@ func createAttribute(t AttributeType, len int) (*Attribute, error) {
 	return &Attribute{
 		buffer: b,
 	}, nil
+}
+
+func newAttribute(t AttributeType, v []byte) (*Attribute, error) {
+	if len(v) > maxAttributeLen {
+		return nil, errors.New("length of value of attribute too big")
+	}
+
+	l := len(v) + 2
+	b := make([]byte, l)
+	b[0] = byte(t)
+	b[1] = byte(l)
+	copy(b[2:], v)
+	return &Attribute{
+		buffer: b,
+	}, nil
+}
+
+func serializeRequestAttributes(attrMap AttributeMap, secret string, authenticator []byte) ([]*Attribute, error) {
+	s := []byte(secret)
+	attrs := make([]*Attribute, 0, len(attrMap))
+	for t, v := range attrMap {
+		switch t {
+		case AttributeTypeUserName,
+			AttributeTypeFilterId,
+			AttributeTypeReplyMessage,
+			AttributeTypeCallbackNumber,
+			AttributeTypeCallbackId,
+			AttributeTypeFramedRoute,
+			AttributeTypeCalledStationId,
+			AttributeTypeCallingStationId,
+			AttributeTypeNasIdentifier,
+			AttributeTypeLoginLatService,
+			AttributeTypeLoginLatNode,
+			AttributeTypeAcctSessionId,
+			AttributeTypeAcctMultiSessionId,
+			AttributeTypeLoginLatPort,
+			AttributeTypeTunnelPrivateGroupId,
+			AttributeTypeEgressVlanName:
+			a, err := newAttribute(t, []byte(v))
+			if err != nil {
+				return attrs, err
+			}
+			attrs = append(attrs, a)
+		case AttributeTypeState,
+			AttributeTypeClass,
+			AttributeTypeProxyState,
+			AttributeTypeLoginLatGroup,
+			AttributeTypeFramedAppleTalkZone,
+			AttributeTypeUserPriorityTable:
+			a, err := newEmptyAttribute(t, len(v)/2)
+			if err != nil {
+				return attrs, err
+			}
+			_, err = hex.Decode(a.Value(), []byte(v))
+			if err != nil {
+				return attrs, fmt.Errorf("invalid hex string: %w", err)
+			}
+			attrs = append(attrs, a)
+		case AttributeTypeMessageAuthenticator:
+			ma, err := newEmptyAttribute(AttributeTypeMessageAuthenticator, md5.Size)
+			if err != nil {
+				return attrs, err
+			}
+			attrs = append(attrs, ma)
+		case AttributeTypeUserPassword:
+			pw := []byte(v)
+			enc := make([]byte, 0, ((len(pw)-1)|(15))+1)
+
+			hash := md5.New()
+			hash.Write(s)
+			hash.Write(authenticator)
+			enc = hash.Sum(enc)
+
+			for i := 0; i < 16 && i < len(pw); i++ {
+				enc[i] ^= pw[i]
+			}
+
+			for i := 16; i < len(pw); i += 16 {
+				hash.Reset()
+				hash.Write(s)
+				hash.Write(enc[i-16 : i])
+				enc = hash.Sum(enc)
+				for j := 0; j < 16 && i+j < len(pw); j++ {
+					enc[i+j] ^= pw[i+j]
+				}
+			}
+
+			a, err := newAttribute(t, enc)
+			if err != nil {
+				return attrs, err
+			}
+			attrs = append(attrs, a)
+		case AttributeTypeNasIpAddress,
+			AttributeTypeFramedIpAddress,
+			AttributeTypeFramedIpNetmask,
+			AttributeTypeLoginIpHost:
+			ip := net.ParseIP(v)
+			ip = ip.To4()
+			if ip == nil {
+				return attrs, fmt.Errorf("invalid IPv4 address: %s", v)
+			}
+			a, err := newAttribute(t, ip)
+			if err != nil {
+				return attrs, err
+			}
+			attrs = append(attrs, a)
+		case AttributeTypeNasPort,
+			AttributeTypeFramedMtu,
+			AttributeTypeLoginTcpPort,
+			AttributeTypeFramedIpxNetwork,
+			AttributeTypeSessionTimeout,
+			AttributeTypeIdleTimeout,
+			AttributeTypeFramedAppleTalkLink,
+			AttributeTypeFramedAppleTalkNetwork,
+			AttributeTypeAcctDelayTime,
+			AttributeTypeAcctInputOctets,
+			AttributeTypeAcctOutputOctets,
+			AttributeTypeAcctSessionTime,
+			AttributeTypeAcctInputPackets,
+			AttributeTypeAcctOutputPackets,
+			AttributeTypeAcctLinkCount,
+			AttributeTypePortLimit:
+			i, err := strconv.ParseUint(v, 10, 0)
+			if err != nil {
+				return attrs, err
+			}
+			a, err := newEmptyAttribute(t, 4)
+			if err != nil {
+				return attrs, err
+			}
+			binary.BigEndian.PutUint32(a.Value(), uint32(i))
+			attrs = append(attrs, a)
+		case AttributeTypeServiceType,
+			AttributeTypeFramedProtocol,
+			AttributeTypeFramedRouting,
+			AttributeTypeFramedCompression,
+			AttributeTypeLoginService,
+			AttributeTypeTerminationAction,
+			AttributeTypeErrorCause,
+			AttributeTypeAcctStatusType,
+			AttributeTypeAcctAuthentic,
+			AttributeTypeAcctTerminateCause,
+			AttributeTypeNasPortType,
+			AttributeTypeTunnelType,
+			AttributeTypeTunnelMediumType,
+			AttributeTypeIngressFilters:
+			return attrs, fmt.Errorf("TODO: enums not implemented yet")
+		case AttributeTypeVendorSpecific:
+			return attrs, fmt.Errorf("TODO: VSA not implemented yet")
+		case AttributeTypeEgressVlanId:
+			return attrs, fmt.Errorf("TODO: egress VLAN ID not implemented yet")
+		default:
+			return attrs, fmt.Errorf("unimplemented attribute: %s", t.String())
+		}
+	}
+	return attrs, nil
 }
 
 func (a Attribute) Type() AttributeType {

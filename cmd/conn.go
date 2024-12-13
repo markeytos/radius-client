@@ -18,6 +18,10 @@ import (
 	"github.com/markeytos/radius-client/radius"
 )
 
+var defaultSendAttrs = map[radius.AttributeType]string{
+	radius.AttributeTypeNasIdentifier: "radius-client",
+}
+
 func dialUDP(ip string, port int) (net.Conn, error) {
 	d := net.Dialer{Timeout: 10 * time.Second}
 	return d.Dial("udp", fmt.Sprintf("%s:%d", ip, port))
@@ -76,7 +80,7 @@ func dialTLS(address, serverCA, clientCer string) (*tls.Conn, error) {
 	return conn, conn.Handshake()
 }
 
-func newUDPAuthSession(address, sharedSecret string) (radius.Session, error) {
+func newUDPAuthSession(address, sharedSecret string) (*radius.AuthenticationSession, error) {
 	to, err := time.ParseDuration(udpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)
@@ -85,10 +89,10 @@ func newUDPAuthSession(address, sharedSecret string) (radius.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries), nil
+	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, defaultSendAttrs)
 }
 
-func newUDPAcctSession(address, sharedSecret string) (radius.Session, error) {
+func newUDPAcctSession(address, sharedSecret string) (*radius.AccountingSession, error) {
 	to, err := time.ParseDuration(udpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)
@@ -100,7 +104,7 @@ func newUDPAcctSession(address, sharedSecret string) (radius.Session, error) {
 	return radius.NewAccountingSession(conn, sharedSecret, to, udpRetries), nil
 }
 
-func newTLSAuthSession(address, serverCA, clientCer string) (radius.Session, error) {
+func newTLSAuthSession(address, serverCA, clientCer string) (*radius.AuthenticationSession, error) {
 	to, err := time.ParseDuration(tlsTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)
@@ -109,10 +113,10 @@ func newTLSAuthSession(address, serverCA, clientCer string) (radius.Session, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	return radius.NewAuthenticationSession(conn, "radsec", to, 1), nil
+	return radius.NewAuthenticationSession(conn, "radsec", to, 1, defaultSendAttrs)
 }
 
-func newTLSAcctSession(address, serverCA, clientCer string) (radius.Session, error) {
+func newTLSAcctSession(address, serverCA, clientCer string) (*radius.AccountingSession, error) {
 	to, err := time.ParseDuration(tlsTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)

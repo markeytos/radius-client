@@ -22,7 +22,6 @@ import (
 	"bufio"
 	"crypto/hmac"
 	"crypto/md5"
-	"crypto/rand"
 	"crypto/subtle"
 	"encoding/binary"
 	"errors"
@@ -39,37 +38,7 @@ type Datagram struct {
 	Attributes []*Attribute
 }
 
-func CreateDatagram(c Code, id uint8, attrs []*Attribute) (*Datagram, error) {
-	// id, err := rand_uint8()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	attrs_len := 0
-	for _, a := range attrs {
-		attrs_len += len(a.buffer)
-	}
-
-	h := &Header{
-		Code:       c,
-		Identifier: id,
-		Length:     uint16(headerLen + attrs_len),
-	}
-
-	d := &Datagram{
-		Header:     h,
-		Attributes: attrs,
-	}
-
-	_, err := rand.Read(h.Authenticator[:])
-	if err != nil {
-		return nil, err
-	}
-
-	return d, nil
-}
-
-func CreateDatagramFromReader(r io.Reader) (*Datagram, error) {
+func DeserializeDatagramFromReader(r io.Reader) (*Datagram, error) {
 	br := bufio.NewReader(r)
 
 	h := &Header{}
@@ -118,50 +87,45 @@ func (d *Datagram) WriteTo(w io.Writer) (int64, error) {
 	return written, bw.Flush()
 }
 
-func (d *Datagram) ContainsAttribute(t AttributeType) bool {
+func (d *Datagram) FirstAttribute(t AttributeType) *Attribute {
 	for _, a := range d.Attributes {
 		if a.Type() == t {
-			return true
+			return a
 		}
 	}
-	return false
-}
-
-func (d *Datagram) AddAttribute(t AttributeType, vlen int) (*Attribute, error) {
-	a, err := createAttribute(AttributeTypeMessageAuthenticator, vlen)
-	if err != nil {
-		return nil, err
-	}
-	newLen := d.Header.Length + uint16(len(a.buffer))
-	if newLen > datagramMaxLen {
-		return nil, errors.New("reached maximum size of datagram")
-	}
-	d.Header.Length = newLen
-	d.Attributes = append(d.Attributes, a)
-	return a, nil
-}
-
-func (d *Datagram) AddRequestMessageAuthenticator(ss string) error {
-	for _, a := range d.Attributes {
-		if a.Type() == AttributeTypeMessageAuthenticator {
-			return errors.New("datagram already has a message authenticator")
-		}
-	}
-	ma, err := d.AddAttribute(AttributeTypeMessageAuthenticator, md5.Size)
-	if err != nil {
-		return err
-	}
-
-	mac := hmac.New(md5.New, []byte(ss))
-	_, err = d.WriteTo(mac)
-	if err != nil {
-		return err
-	}
-	sum := mac.Sum(nil)
-
-	copy(ma.Value(), sum)
 	return nil
 }
+
+func (d *Datagram) ContainsAttribute(t AttributeType) bool {
+	return d.FirstAttribute(t) != nil
+}
+
+// func (d *Datagram) AddAttribute(t AttributeType, vlen int) (*Attribute, error) {
+// 	a, err := newAttribute(AttributeTypeMessageAuthenticator, vlen)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	newLen := d.Header.Length + uint16(len(a.buffer))
+// 	if newLen > datagramMaxLen {
+// 		return nil, errors.New("reached maximum size of datagram")
+// 	}
+// 	d.Header.Length = newLen
+// 	d.Attributes = append(d.Attributes, a)
+// 	return a, nil
+// }
+//
+// func (d *Datagram) AddRequestMessageAuthenticator(ss string) error {
+// 	for _, a := range d.Attributes {
+// 		if a.Type() == AttributeTypeMessageAuthenticator {
+// 			return errors.New("datagram already has a message authenticator")
+// 		}
+// 	}
+// 	ma, err := d.AddAttribute(AttributeTypeMessageAuthenticator, md5.Size)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// }
 
 // Verify datagram's response authenticator, and, if present, the Message-Authenticator
 func (d *Datagram) ValidResponseAuthenticatorAndMessageAuthenticator(reqauth [16]byte, ss string) bool {

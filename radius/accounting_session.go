@@ -20,7 +20,6 @@ func NewAccountingSession(conn net.Conn, ss string, timeout time.Duration, retri
 	return &AccountingSession{
 		baseSession: baseSession{
 			identifier:   randUint8(),
-			rounds:       0,
 			conn:         conn,
 			sharedSecret: ss,
 			timeout:      timeout,
@@ -30,13 +29,9 @@ func NewAccountingSession(conn net.Conn, ss string, timeout time.Duration, retri
 }
 
 func (s *AccountingSession) Status() error {
-	sd, err := CreateDatagram(CodeStatusServer, s.identifier, nil)
+	sd, err := s.createDatagram(CodeStatusServer, AttributeMap{AttributeTypeMessageAuthenticator: ""})
 	if err != nil {
 		return fmt.Errorf("failed to create datagram: %w", err)
-	}
-	err = sd.AddRequestMessageAuthenticator(s.sharedSecret)
-	if err != nil {
-		return fmt.Errorf("failed to add message authenticator: %w", err)
 	}
 	s.identifier++
 
@@ -50,9 +45,6 @@ func (s *AccountingSession) Status() error {
 	}
 	if !rd.ContainsAttribute(AttributeTypeMessageAuthenticator) {
 		return errors.New("missing message authenticator in response")
-	}
-	if !rd.ValidResponseAuthenticatorAndMessageAuthenticator(sd.Header.Authenticator, s.sharedSecret) {
-		return errors.New("invalid response authenticators")
 	}
 	return nil
 }
