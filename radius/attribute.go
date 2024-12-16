@@ -12,10 +12,10 @@ Define RADIUS attributes of the following format
 package radius
 
 import (
+	"crypto/hmac"
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -28,40 +28,73 @@ const (
 type AttributeMap map[AttributeType]string
 
 type Attribute struct {
-	buffer []byte
+	Type  AttributeType
+	Value []byte
 }
 
-func newEmptyAttribute(t AttributeType, len int) (*Attribute, error) {
-	if len > maxAttributeLen {
-		return nil, errors.New("length of value of attribute too big")
-	}
-
-	l := len + 2
-	b := make([]byte, l)
-	b[0] = byte(t)
-	b[1] = byte(l)
-	return &Attribute{
-		buffer: b,
-	}, nil
-}
-
-func newAttribute(t AttributeType, v []byte) (*Attribute, error) {
+func newAttribute(t AttributeType, v []byte) *Attribute {
 	if len(v) > maxAttributeLen {
-		return nil, errors.New("length of value of attribute too big")
+		panic("length of value of attribute too big")
 	}
-
-	l := len(v) + 2
-	b := make([]byte, l)
-	b[0] = byte(t)
-	b[1] = byte(l)
-	copy(b[2:], v)
-	return &Attribute{
-		buffer: b,
-	}, nil
+	return &Attribute{Type: t, Value: v}
 }
 
-func serializeRequestAttributes(attrMap AttributeMap, secret string, authenticator []byte) ([]*Attribute, error) {
+func newEmptyAttribute(t AttributeType, l int) *Attribute {
+	if l > maxAttributeLen {
+		panic("length of empty attribute too big")
+	}
+	return newAttribute(t, make([]byte, l))
+}
+
+func newUserPasswordAttribute(password, secret string, authenticator []byte) *Attribute {
 	s := []byte(secret)
+	pw := []byte(password)
+	enc := make([]byte, 0, ((len(pw)-1)|(15))+1)
+
+	hash := md5.New()
+	hash.Write(s)
+	hash.Write(authenticator)
+	enc = hash.Sum(enc)
+
+	for i := 0; i < 16 && i < len(pw); i++ {
+		enc[i] ^= pw[i]
+	}
+
+	for i := 16; i < len(pw); i += 16 {
+		hash.Reset()
+		hash.Write(s)
+		hash.Write(enc[i-16 : i])
+		enc = hash.Sum(enc)
+		for j := 0; j < 16 && i+j < len(pw); j++ {
+			enc[i+j] ^= pw[i+j]
+		}
+	}
+
+	return newAttribute(AttributeTypeUserPassword, enc)
+}
+
+func newEmptyMessageAuthenticator() *Attribute {
+	return newEmptyAttribute(AttributeTypeMessageAuthenticator, md5.Size)
+}
+
+func writeMessageAuthenticator(d *Datagram, ma *Attribute, secret string) error {
+	if ma.Type != AttributeTypeMessageAuthenticator || len(ma.Value) != md5.Size {
+		return fmt.Errorf("invalid message authenticator attribute")
+	}
+	for i := range ma.Value {
+		ma.Value[i] = 0
+	}
+	mac := hmac.New(md5.New, []byte(secret))
+	_, err := d.WriteTo(mac)
+	if err != nil {
+		return err
+	}
+	sum := mac.Sum(nil)
+	copy(ma.Value, sum)
+	return nil
+}
+
+func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 	attrs := make([]*Attribute, 0, len(attrMap))
 	for t, v := range attrMap {
 		switch t {
@@ -81,60 +114,21 @@ func serializeRequestAttributes(attrMap AttributeMap, secret string, authenticat
 			AttributeTypeLoginLatPort,
 			AttributeTypeTunnelPrivateGroupId,
 			AttributeTypeEgressVlanName:
-			a, err := newAttribute(t, []byte(v))
-			if err != nil {
-				return attrs, err
-			}
-			attrs = append(attrs, a)
+			attrs = append(attrs, newAttribute(t, []byte(v)))
 		case AttributeTypeState,
 			AttributeTypeClass,
 			AttributeTypeProxyState,
 			AttributeTypeLoginLatGroup,
 			AttributeTypeFramedAppleTalkZone,
 			AttributeTypeUserPriorityTable:
-			a, err := newEmptyAttribute(t, len(v)/2)
-			if err != nil {
-				return attrs, err
-			}
-			_, err = hex.Decode(a.Value(), []byte(v))
+			a := newEmptyAttribute(t, len(v)/2)
+			_, err := hex.Decode(a.Value, []byte(v))
 			if err != nil {
 				return attrs, fmt.Errorf("invalid hex string: %w", err)
 			}
 			attrs = append(attrs, a)
 		case AttributeTypeMessageAuthenticator:
-			ma, err := newEmptyAttribute(AttributeTypeMessageAuthenticator, md5.Size)
-			if err != nil {
-				return attrs, err
-			}
-			attrs = append(attrs, ma)
-		case AttributeTypeUserPassword:
-			pw := []byte(v)
-			enc := make([]byte, 0, ((len(pw)-1)|(15))+1)
-
-			hash := md5.New()
-			hash.Write(s)
-			hash.Write(authenticator)
-			enc = hash.Sum(enc)
-
-			for i := 0; i < 16 && i < len(pw); i++ {
-				enc[i] ^= pw[i]
-			}
-
-			for i := 16; i < len(pw); i += 16 {
-				hash.Reset()
-				hash.Write(s)
-				hash.Write(enc[i-16 : i])
-				enc = hash.Sum(enc)
-				for j := 0; j < 16 && i+j < len(pw); j++ {
-					enc[i+j] ^= pw[i+j]
-				}
-			}
-
-			a, err := newAttribute(t, enc)
-			if err != nil {
-				return attrs, err
-			}
-			attrs = append(attrs, a)
+			attrs = append(attrs, newEmptyMessageAuthenticator())
 		case AttributeTypeNasIpAddress,
 			AttributeTypeFramedIpAddress,
 			AttributeTypeFramedIpNetmask,
@@ -144,11 +138,7 @@ func serializeRequestAttributes(attrMap AttributeMap, secret string, authenticat
 			if ip == nil {
 				return attrs, fmt.Errorf("invalid IPv4 address: %s", v)
 			}
-			a, err := newAttribute(t, ip)
-			if err != nil {
-				return attrs, err
-			}
-			attrs = append(attrs, a)
+			attrs = append(attrs, newAttribute(t, ip))
 		case AttributeTypeNasPort,
 			AttributeTypeFramedMtu,
 			AttributeTypeLoginTcpPort,
@@ -169,11 +159,8 @@ func serializeRequestAttributes(attrMap AttributeMap, secret string, authenticat
 			if err != nil {
 				return attrs, err
 			}
-			a, err := newEmptyAttribute(t, 4)
-			if err != nil {
-				return attrs, err
-			}
-			binary.BigEndian.PutUint32(a.Value(), uint32(i))
+			a := newEmptyAttribute(t, 4)
+			binary.BigEndian.PutUint32(a.Value, uint32(i))
 			attrs = append(attrs, a)
 		case AttributeTypeServiceType,
 			AttributeTypeFramedProtocol,
@@ -194,19 +181,13 @@ func serializeRequestAttributes(attrMap AttributeMap, secret string, authenticat
 			return attrs, fmt.Errorf("TODO: VSA not implemented yet")
 		case AttributeTypeEgressVlanId:
 			return attrs, fmt.Errorf("TODO: egress VLAN ID not implemented yet")
+		case AttributeTypeUserPassword:
+			return attrs, fmt.Errorf("use other constructors for encrypted attributes")
 		default:
 			return attrs, fmt.Errorf("unimplemented attribute: %s", t.String())
 		}
 	}
 	return attrs, nil
-}
-
-func (a Attribute) Type() AttributeType {
-	return AttributeType(a.buffer[0])
-}
-
-func (a Attribute) Value() []byte {
-	return a.buffer[2:]
 }
 
 type AttributeType uint8

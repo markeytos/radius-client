@@ -19,10 +19,7 @@ Define RADIUS datagram of the following format
 package radius
 
 import (
-	"bufio"
-	"crypto/hmac"
-	"crypto/md5"
-	"crypto/subtle"
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -30,7 +27,7 @@ import (
 
 const (
 	headerLen      = 20
-	datagramMaxLen = 4096
+	DatagramMaxLen = 4096
 )
 
 type Datagram struct {
@@ -38,58 +35,97 @@ type Datagram struct {
 	Attributes []*Attribute
 }
 
-func DeserializeDatagramFromReader(r io.Reader) (*Datagram, error) {
-	br := bufio.NewReader(r)
+func newDatagram(h *Header, attrs []*Attribute) *Datagram {
+	attrs_len := 0
+	for _, a := range attrs {
+		attrs_len += len(a.Value) + 2
+	}
+	if attrs_len > DatagramMaxLen-headerLen {
+		panic("attribute overflows packet to over max size")
+	}
+	h.Length = headerLen + uint16(attrs_len)
 
-	h := &Header{}
-	err := binary.Read(br, binary.BigEndian, h)
-	if err != nil {
-		return nil, err
+	return &Datagram{
+		Header:     h,
+		Attributes: attrs,
 	}
-
-	var attrs []*Attribute
-	rlen := h.Length - headerLen
-	buf := make([]byte, rlen)
-	n, err := br.Read(buf)
-	if err != nil {
-		return nil, err
-	}
-	if n != len(buf) {
-		return nil, errors.New("missing spacing in attributes")
-	}
-	for len(buf) > 0 {
-		if rlen < 2 {
-			return nil, errors.New("malformed attribute shape")
-		}
-		l := buf[1]
-		attrs = append(attrs, &Attribute{buffer: buf[:l]})
-		buf = buf[l:]
-	}
-
-	return &Datagram{Header: h, Attributes: attrs}, nil
 }
 
-func (d *Datagram) WriteTo(w io.Writer) (int64, error) {
-	written := int64(0)
-	bw := bufio.NewWriter(w)
-	err := binary.Write(bw, binary.BigEndian, d.Header)
+func (d *Datagram) ReadFrom(r io.Reader) (int64, error) {
+	b := make([]byte, DatagramMaxLen)
+	rn, err := r.Read(b)
+	n := int64(rn)
+	if err != nil {
+		return n, err
+	}
+	br := bytes.NewReader(b[:rn])
+
+	h := &Header{}
+	err = binary.Read(br, binary.BigEndian, h)
+	if err != nil {
+		return n, err
+	}
+	d.Header = h
+
+	var attrs []*Attribute
+	if br.Len() != int(h.Length-headerLen) {
+		return n, errors.New("packet length does not match actual packet")
+	}
+	for br.Len() > 0 {
+		tbyte, err := br.ReadByte()
+		if err != nil {
+			return n, err
+		}
+
+		lbyte, err := br.ReadByte()
+		if err != nil {
+			return n, err
+		}
+
+		value := make([]byte, lbyte-2)
+		rcount, err := br.Read(value)
+		if err != nil {
+			return n, err
+		}
+		if rcount < int(lbyte-2) {
+			return n, errors.New("attribute shorter than noted length")
+		}
+
+		attrs = append(attrs, &Attribute{Type: AttributeType(tbyte), Value: value})
+	}
+	d.Attributes = attrs
+
+	return n, nil
+}
+
+func (d Datagram) WriteTo(w io.Writer) (int64, error) {
+	b := bytes.NewBuffer(make([]byte, 0, int(d.Header.Length)))
+	err := binary.Write(b, binary.BigEndian, d.Header)
 	if err != nil {
 		return 0, err
 	}
-	written += headerLen
 	for _, a := range d.Attributes {
-		_, err = bw.Write(a.buffer)
+		attrlen := len(a.Value) + 2
+		err = b.WriteByte(byte(a.Type))
 		if err != nil {
-			return written, err
+			return 0, err
 		}
-		written += int64(len(a.buffer))
+		err = b.WriteByte(byte(attrlen))
+		if err != nil {
+			return 0, err
+		}
+		_, err = b.Write(a.Value)
+		if err != nil {
+			return 0, err
+		}
 	}
-	return written, bw.Flush()
+	n, err := w.Write(b.Bytes())
+	return int64(n), err
 }
 
 func (d *Datagram) FirstAttribute(t AttributeType) *Attribute {
 	for _, a := range d.Attributes {
-		if a.Type() == t {
+		if a.Type == t {
 			return a
 		}
 	}
@@ -98,109 +134,6 @@ func (d *Datagram) FirstAttribute(t AttributeType) *Attribute {
 
 func (d *Datagram) ContainsAttribute(t AttributeType) bool {
 	return d.FirstAttribute(t) != nil
-}
-
-// func (d *Datagram) AddAttribute(t AttributeType, vlen int) (*Attribute, error) {
-// 	a, err := newAttribute(AttributeTypeMessageAuthenticator, vlen)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	newLen := d.Header.Length + uint16(len(a.buffer))
-// 	if newLen > datagramMaxLen {
-// 		return nil, errors.New("reached maximum size of datagram")
-// 	}
-// 	d.Header.Length = newLen
-// 	d.Attributes = append(d.Attributes, a)
-// 	return a, nil
-// }
-//
-// func (d *Datagram) AddRequestMessageAuthenticator(ss string) error {
-// 	for _, a := range d.Attributes {
-// 		if a.Type() == AttributeTypeMessageAuthenticator {
-// 			return errors.New("datagram already has a message authenticator")
-// 		}
-// 	}
-// 	ma, err := d.AddAttribute(AttributeTypeMessageAuthenticator, md5.Size)
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// }
-
-// Verify datagram's response authenticator, and, if present, the Message-Authenticator
-func (d *Datagram) ValidResponseAuthenticatorAndMessageAuthenticator(reqauth [16]byte, ss string) bool {
-	swap(d.Header.Authenticator[:], reqauth[:])
-
-	maValid := true
-	var ma *Attribute
-	for _, a := range d.Attributes {
-		if a.Type() == AttributeTypeMessageAuthenticator {
-			ma = a
-			break
-		}
-	}
-	if ma != nil {
-		buff := ma.Value()
-		if len(buff) != md5.Size {
-			return false
-		}
-		old := make([]byte, md5.Size)
-		for i := 0; i < md5.Size; i++ {
-			old[i] = buff[i]
-			buff[i] = 0
-		}
-
-		mac := hmac.New(md5.New, []byte(ss))
-		_, err := d.WriteTo(mac)
-		if err != nil {
-			return false
-		}
-		sum := mac.Sum(nil)
-		copy(buff, sum)
-		maValid = subtle.ConstantTimeCompare(sum, old) == 1
-	}
-
-	hash := md5.New()
-	_, err := d.WriteTo(hash)
-	if err != nil {
-		panic(err)
-	}
-	hash.Write([]byte(ss))
-	sum := hash.Sum(nil)
-	return maValid && subtle.ConstantTimeCompare(sum, reqauth[:]) == 1
-}
-
-// Verify datagram's, if present, the Message-Authenticator
-func (d *Datagram) ValidRequestMessageAuthenticator(ss string) bool {
-	var attr *Attribute
-	for _, a := range d.Attributes {
-		if a.Type() == AttributeTypeMessageAuthenticator {
-			attr = a
-			break
-		}
-	}
-	if attr == nil {
-		return true
-	}
-
-	buff := attr.Value()
-	if len(buff) != md5.Size {
-		return false
-	}
-	old := make([]byte, md5.Size)
-	for i := 0; i < md5.Size; i++ {
-		old[i] = buff[i]
-		buff[i] = 0
-	}
-
-	mac := hmac.New(md5.New, []byte(ss))
-	_, err := d.WriteTo(mac)
-	if err != nil {
-		return false
-	}
-	sum := mac.Sum(nil)
-	copy(buff, sum)
-	return subtle.ConstantTimeCompare(sum, old) == 1
 }
 
 type Header struct {

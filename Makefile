@@ -1,4 +1,4 @@
-build:
+./bin/radius-client: ./radius/*.go
 	@mkdir -p bin
 	go build -o ./bin/radius-client
 

@@ -16,7 +16,11 @@ type AuthenticationSession struct {
 	baseSession
 }
 
-func NewAuthenticationSession(conn net.Conn, ss string, timeout time.Duration, retries int, sendattrs map[AttributeType]string) (*AuthenticationSession, error) {
+func NewAuthenticationSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSize int, sendattrsMap map[AttributeType]string) (*AuthenticationSession, error) {
+	sendattrs, err := serializeAttributeMap(sendattrsMap)
+	if err != nil {
+		return nil, err
+	}
 	return &AuthenticationSession{
 		baseSession: baseSession{
 			identifier:     randUint8(),
@@ -24,21 +28,19 @@ func NewAuthenticationSession(conn net.Conn, ss string, timeout time.Duration, r
 			sharedSecret:   ss,
 			timeout:        timeout,
 			retries:        retries,
+			mtuSize:        mtuSize,
 			sendAttributes: sendattrs,
 		},
 	}, nil
 }
 
 func (s *AuthenticationSession) MAB(macAddress string) error {
-	attrm := map[AttributeType]string{
-		AttributeTypeUserName: macAddress,
-	}
-	sd, err := s.createDatagram(CodeAccessRequest, attrm)
-	if err != nil {
-		return fmt.Errorf("failed to create datagram: %w", err)
-	}
-
-	rd, err := s.sendReceiveDatagram(sd)
+	sd := s.newRequestDatagram(
+		CodeAccessRequest,
+		newAttribute(AttributeTypeUserName, []byte(macAddress)),
+	)
+	rd := &Datagram{}
+	err := s.WriteReadDatagram(sd, rd)
 	if err != nil {
 		return fmt.Errorf("failed to do MAB round: %w", err)
 	}
@@ -48,22 +50,22 @@ func (s *AuthenticationSession) MAB(macAddress string) error {
 		if a == nil {
 			return fmt.Errorf("MAB authentication failed")
 		}
-		return fmt.Errorf("MAB authentication failed: %s", string(a.Value()))
+		return fmt.Errorf("MAB authentication failed: %s", string(a.Value))
 	}
 	return nil
 }
 
 func (s *AuthenticationSession) PAP(username, password string) error {
-	attrm := map[AttributeType]string{
-		AttributeTypeUserName:     username,
-		AttributeTypeUserPassword: password,
-	}
-	sd, err := s.createDatagram(CodeAccessRequest, attrm)
-	if err != nil {
-		return fmt.Errorf("failed to create datagram: %w", err)
-	}
+	h := s.newRequestHeader(CodeAccessRequest)
+	sd := s.newDatagram(
+		h,
+		newAttribute(AttributeTypeUserName, []byte(username)),
+		newUserPasswordAttribute(password, s.sharedSecret, h.Authenticator[:]),
+		newEmptyMessageAuthenticator(),
+	)
+	rd := &Datagram{}
 
-	rd, err := s.sendReceiveDatagram(sd)
+	err := s.WriteReadDatagram(sd, rd)
 	if err != nil {
 		return fmt.Errorf("failed to do MAB round: %w", err)
 	}
@@ -73,42 +75,18 @@ func (s *AuthenticationSession) PAP(username, password string) error {
 		if a == nil {
 			return fmt.Errorf("PAP authentication failed")
 		}
-		return fmt.Errorf("PAP authentication failed: %s", string(a.Value()))
+		return fmt.Errorf("PAP authentication failed: %s", string(a.Value))
 	}
 	return nil
 }
 
-func (s *AuthenticationSession) EapMsChapV2(username, password string) error {
-	return errors.New("not implemented EapMsChapV2")
-}
-
-// func (s *AuthenticationSession) EapTLS(username, password string) error {
-// 	return errors.New("not implemented EapTLS")
-// }
-
-func (s *AuthenticationSession) EapTtlsPAP(username, password string) error {
-	return errors.New("not implemented EapTtlsPAP")
-}
-
-func (s *AuthenticationSession) EapTtlsEapMsChapV2(username, password string) error {
-	return errors.New("not implemented EapTtlsEapMsChapV2")
-}
-
-// func (s *AuthenticationSession) EapTtlsEapTLS(username, password string) error {
-// 	return errors.New("not implemented EapTtlsEapTLS")
-// }
-
-// func (s *AuthenticationSession) PeapMsChapV2(username, password string) error {
-// 	return errors.New("not implemented PeapMsChapV2")
-// }
-
 func (s *AuthenticationSession) Status() error {
-	sd, err := s.createDatagram(CodeStatusServer, AttributeMap{AttributeTypeMessageAuthenticator: ""})
-	if err != nil {
-		return fmt.Errorf("failed to create datagram: %w", err)
-	}
-
-	rd, err := s.sendReceiveDatagram(sd)
+	sd := s.newRequestDatagram(
+		CodeStatusServer,
+		newEmptyMessageAuthenticator(),
+	)
+	rd := &Datagram{}
+	err := s.WriteReadDatagram(sd, rd)
 	if err != nil {
 		return fmt.Errorf("failed to carry out status round: %w", err)
 	}

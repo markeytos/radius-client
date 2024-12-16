@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/markeytos/radius-client/radius"
+	"github.com/markeytos/radius-client/radius/eap"
 	"github.com/spf13/cobra"
 )
 
@@ -15,27 +16,29 @@ import (
 const (
 	authStrMAB                = "mab"
 	authStrPAP                = "pap"
-	authStrEapMsChapV2        = "eap-ms-chapv2"
+	authStrEapMsCHAPv2        = "eap-ms-chapv2"
 	authStrEapTLS             = "eap-tls"
 	authStrEapTtlsPAP         = "eap-ttls-pap"
-	authStrEapTtlsEapMsChapV2 = "eap-ttls-eap-ms-chapv2"
+	authStrEapTtlsEapMsCHAPv2 = "eap-ttls-eap-ms-chapv2"
 	authStrEapTtlsEapTLS      = "eap-ttls-eap-tls"
-	authStrPeapMsChapV2       = "peap-ms-chapv2"
+	authStrPeapMsCHAPv2       = "peap-ms-chapv2"
 )
 
 var (
 	authMAB                bool
 	authPAP                bool
-	authEapMsChapV2        bool
+	authEapMsCHAPv2        bool
 	authEapTLS             bool
 	authEapTtlsPAP         bool
-	authEapTtlsEapMsChapV2 bool
+	authEapTtlsEapMsCHAPv2 bool
 	authEapTtlsEapTLS      bool
-	authPeapMsChapV2       bool
+	authPeapMsCHAPv2       bool
 
-	macAddress string
-	username   string
-	password   string
+	macAddress        string
+	username          string
+	password          string
+	anonymousUsername string
+	eapSendStart      bool
 )
 
 var authCmd = &cobra.Command{
@@ -78,19 +81,21 @@ var authTlsCmd = &cobra.Command{
 func init() {
 	authCmd.PersistentFlags().BoolVar(&authMAB, authStrMAB, false, "Authenticate with MAC authentication bypass")
 	authCmd.PersistentFlags().BoolVar(&authPAP, authStrPAP, false, "Authenticate with MAC authentication bypass")
-	authCmd.PersistentFlags().BoolVar(&authEapMsChapV2, authStrEapMsChapV2, false, "Authenticate with MAC authentication bypass")
+	authCmd.PersistentFlags().BoolVar(&authEapMsCHAPv2, authStrEapMsCHAPv2, false, "Authenticate with MAC authentication bypass")
 	authCmd.PersistentFlags().BoolVar(&authEapTLS, authStrEapTLS, false, "Authenticate with MAC authentication bypass")
 	authCmd.PersistentFlags().BoolVar(&authEapTtlsPAP, authStrEapTtlsPAP, false, "Authenticate with MAC authentication bypass")
-	authCmd.PersistentFlags().BoolVar(&authEapTtlsEapMsChapV2, authStrEapTtlsEapMsChapV2, false, "Authenticate with MAC authentication bypass")
+	authCmd.PersistentFlags().BoolVar(&authEapTtlsEapMsCHAPv2, authStrEapTtlsEapMsCHAPv2, false, "Authenticate with MAC authentication bypass")
 	authCmd.PersistentFlags().BoolVar(&authEapTtlsEapTLS, authStrEapTtlsEapTLS, false, "Authenticate with MAC authentication bypass")
-	authCmd.PersistentFlags().BoolVar(&authPeapMsChapV2, authStrPeapMsChapV2, false, "Authenticate with MAC authentication bypass")
+	authCmd.PersistentFlags().BoolVar(&authPeapMsCHAPv2, authStrPeapMsCHAPv2, false, "Authenticate with MAC authentication bypass")
 
 	authCmd.PersistentFlags().StringVar(&macAddress, "mac", "", "MAC Address")
 	authCmd.PersistentFlags().StringVar(&username, "username", "", "Username")
 	authCmd.PersistentFlags().StringVar(&password, "password", "", "Password")
+	authCmd.PersistentFlags().StringVar(&anonymousUsername, "anonymous-username", "anonymous", "EAP anonymous username")
+	authCmd.PersistentFlags().BoolVar(&eapSendStart, "eap-send-start", false, "EAP send EAP-Start")
 
-	authCmd.MarkFlagsOneRequired(authStrMAB, authStrPAP, authStrEapMsChapV2, authStrEapTLS, authStrEapTtlsPAP, authStrEapTtlsEapMsChapV2, authStrEapTtlsEapTLS, authStrPeapMsChapV2)
-	authCmd.MarkFlagsMutuallyExclusive(authStrMAB, authStrPAP, authStrEapMsChapV2, authStrEapTLS, authStrEapTtlsPAP, authStrEapTtlsEapMsChapV2, authStrEapTtlsEapTLS, authStrPeapMsChapV2)
+	authCmd.MarkFlagsOneRequired(authStrMAB, authStrPAP, authStrEapMsCHAPv2, authStrEapTLS, authStrEapTtlsPAP, authStrEapTtlsEapMsCHAPv2, authStrEapTtlsEapTLS, authStrPeapMsCHAPv2)
+	authCmd.MarkFlagsMutuallyExclusive(authStrMAB, authStrPAP, authStrEapMsCHAPv2, authStrEapTLS, authStrEapTtlsPAP, authStrEapTtlsEapMsCHAPv2, authStrEapTtlsEapTLS, authStrPeapMsCHAPv2)
 
 	authCmd.MarkFlagsRequiredTogether(authStrMAB, "mac")
 	authCmd.MarkFlagsRequiredTogether("username", "password")
@@ -113,29 +118,31 @@ func auth(session *radius.AuthenticationSession) error {
 	if authPAP {
 		return session.PAP(username, password)
 	}
-	if authEapMsChapV2 {
-		return session.EapMsChapV2(username, password)
+	eaptunnel := radius.NewEapAuthenticationTunnel(*session, anonymousUsername)
+	eapsession := eap.NewSession(eaptunnel, anonymousUsername, eapSendStart)
+	if authEapMsCHAPv2 {
+		return eapsession.MsCHAPv2(username, password)
 	}
 	if authEapTLS {
-		return errors.New("not implemented EAP-TLS")
+		return eapsession.TLS()
 	}
 	if authEapTtlsPAP {
-		return session.EapTtlsPAP(username, password)
+		return eapsession.TtlsPAP(username, password)
 	}
-	if authEapTtlsEapMsChapV2 {
-		return session.EapMsChapV2(username, password)
+	if authEapTtlsEapMsCHAPv2 {
+		return eapsession.TtlsEapMsCHAPv2(username, password)
 	}
 	if authEapTtlsEapTLS {
-		return errors.New("not implemented EAP-TTLS-EAP-TLS")
+		return eapsession.TtlsEapTLS()
 	}
-	if authPeapMsChapV2 {
-		return errors.New("not implemented PEAP-MS-CHAPv2")
+	if authPeapMsCHAPv2 {
+		return eapsession.PeapMsCHAPv2(username, password)
 	}
 	return errors.New("invalid authentication protocol picked")
 }
 
 func prerun(cmd *cobra.Command, args []string) error {
-	passwordBased := authPAP || authEapMsChapV2 || authEapTtlsPAP || authEapTtlsEapMsChapV2 || authPeapMsChapV2
+	passwordBased := authPAP || authEapMsCHAPv2 || authEapTtlsPAP || authEapTtlsEapMsCHAPv2 || authPeapMsCHAPv2
 	if passwordBased && password == "" {
 		return errors.New("Set username and password to carry out password-based protocol")
 	}

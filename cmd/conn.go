@@ -12,15 +12,16 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/markeytos/radius-client/radius"
 )
 
-var defaultSendAttrs = map[radius.AttributeType]string{
-	radius.AttributeTypeNasIdentifier: "radius-client",
-}
+const (
+	defaultMTUSize = 1500
+)
 
 func dialUDP(ip string, port int) (net.Conn, error) {
 	d := net.Dialer{Timeout: 10 * time.Second}
@@ -89,7 +90,11 @@ func newUDPAuthSession(address, sharedSecret string) (*radius.AuthenticationSess
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, defaultSendAttrs)
+	sendAttrs := map[radius.AttributeType]string{
+		radius.AttributeTypeNasIdentifier: "radius-client",
+		radius.AttributeTypeFramedMtu:     strconv.Itoa(defaultMTUSize),
+	}
+	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, defaultMTUSize, sendAttrs)
 }
 
 func newUDPAcctSession(address, sharedSecret string) (*radius.AccountingSession, error) {
@@ -113,7 +118,10 @@ func newTLSAuthSession(address, serverCA, clientCer string) (*radius.Authenticat
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	return radius.NewAuthenticationSession(conn, "radsec", to, 1, defaultSendAttrs)
+	sendAttrs := map[radius.AttributeType]string{
+		radius.AttributeTypeNasIdentifier: "radius-client",
+	}
+	return radius.NewAuthenticationSession(conn, "radsec", to, 1, radius.DatagramMaxLen, sendAttrs)
 }
 
 func newTLSAcctSession(address, serverCA, clientCer string) (*radius.AccountingSession, error) {

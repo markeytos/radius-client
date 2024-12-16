@@ -9,26 +9,26 @@ import (
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rand"
-	"errors"
+	"crypto/subtle"
 	"fmt"
-	"maps"
 	"math/big"
 	"net"
 	"time"
 )
 
 type baseSession struct {
-	identifier     uint8
-	conn           net.Conn
-	sharedSecret   string
-	timeout        time.Duration
-	retries        int
-	sendAttributes AttributeMap
+	identifier          uint8
+	conn                net.Conn
+	sharedSecret        string
+	timeout             time.Duration
+	retries             int
+	mtuSize             int
+	sendAttributes      []*Attribute
+	replyOnceAttributes []*Attribute
+	lastReadDatagram    *Datagram
 }
 
-func (s *baseSession) createDatagram(c Code, attrMap AttributeMap) (*Datagram, error) {
-	maps.Copy(attrMap, s.sendAttributes)
-
+func (s *baseSession) newRequestHeader(c Code) *Header {
 	h := &Header{
 		Code:       c,
 		Identifier: s.identifier,
@@ -36,77 +36,140 @@ func (s *baseSession) createDatagram(c Code, attrMap AttributeMap) (*Datagram, e
 	}
 	_, err := rand.Read(h.Authenticator[:])
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-
-	attrs, err := serializeRequestAttributes(attrMap, s.sharedSecret, h.Authenticator[:])
-	if err != nil {
-		return nil, err
-	}
-
-	attrs_len := 0
-	for _, a := range attrs {
-		attrs_len += len(a.buffer)
-	}
-	h.Length += uint16(attrs_len)
-
-	d := &Datagram{
-		Header:     h,
-		Attributes: attrs,
-	}
-
-	if _, ok := attrMap[AttributeTypeMessageAuthenticator]; ok {
-		ma := d.FirstAttribute(AttributeTypeMessageAuthenticator)
-		if ma == nil {
-			panic("message authenticator must exist in datagram when constructed")
-		}
-		mac := hmac.New(md5.New, []byte(s.sharedSecret))
-		_, err = d.WriteTo(mac)
-		if err != nil {
-			return nil, err
-		}
-		sum := mac.Sum(nil)
-		copy(ma.Value(), sum)
-	}
-
 	s.identifier++
-	return d, nil
+	return h
 }
 
-func (s baseSession) sendReceiveDatagram(sd *Datagram) (*Datagram, error) {
-	attempts := 0
-	conn := s.conn
-	timeout := s.timeout
+func (s *baseSession) newRequestDatagram(c Code, attrs ...*Attribute) *Datagram {
+	h := s.newRequestHeader(c)
+	return s.newDatagram(h, attrs...)
+}
 
+func (s *baseSession) newDatagram(h *Header, attrs ...*Attribute) *Datagram {
+	attrs = append(attrs, s.sendAttributes...)
+	if s.replyOnceAttributes != nil {
+		attrs = append(attrs, s.replyOnceAttributes...)
+		s.replyOnceAttributes = nil
+	}
+	d := newDatagram(h, attrs)
+	if ma := d.FirstAttribute(AttributeTypeMessageAuthenticator); ma != nil {
+		writeMessageAuthenticator(d, ma, s.sharedSecret)
+	}
+	return d
+}
+
+func (s *baseSession) WriteDatagram(sd *Datagram) (int, error) {
+	err := s.conn.SetWriteDeadline(time.Now().Add(s.timeout))
+	if err != nil {
+		return 0, fmt.Errorf("error setting send deadline: %w", err)
+	}
+	n, err := sd.WriteTo(s.conn)
+	if err != nil {
+		return int(n), fmt.Errorf("error sending RADIUS datagram: %w", err)
+	}
+	return int(n), nil
+}
+
+func (s *baseSession) ReadDatagram(rd *Datagram) (int, error) {
+	err := s.conn.SetReadDeadline(time.Now().Add(s.timeout))
+	if err != nil {
+		return 0, fmt.Errorf("error setting receive deadline: %w", err)
+	}
+	n, err := rd.ReadFrom(s.conn)
+	if err != nil {
+		return int(n), fmt.Errorf("error receiving RADIUS datagram: %w", err)
+	}
+	s.lastReadDatagram = rd
+	for _, a := range rd.Attributes {
+		switch a.Type {
+		case AttributeTypeState:
+			s.replyOnceAttributes = append(s.replyOnceAttributes, a)
+		}
+	}
+	return int(n), nil
+}
+
+func (s *baseSession) WriteReadDatagram(sd *Datagram, rd *Datagram) error {
+	attempts := 0
 retry:
-	err := conn.SetWriteDeadline(time.Now().Add(timeout))
+	_, err := s.WriteDatagram(sd)
 	if err != nil {
-		return nil, fmt.Errorf("error setting send deadline: %w", err)
+		return err
 	}
-	_, err = sd.WriteTo(conn)
-	if err != nil {
-		attempts++
-		if attempts > s.retries {
-			goto retry
-		}
-		return nil, fmt.Errorf("error sending datagram: %w", err)
-	}
-	err = conn.SetReadDeadline(time.Now().Add(timeout))
-	if err != nil {
-		return nil, fmt.Errorf("error setting receive deadline: %w", err)
-	}
-	r, err := DeserializeDatagramFromReader(conn)
+	_, err = s.ReadDatagram(rd)
 	if err != nil {
 		attempts++
-		if attempts > s.retries {
+		if attempts < s.retries {
+			println("retry at sending due to no reply")
 			goto retry
 		}
-		return nil, fmt.Errorf("error receiving datagram: %w", err)
+		return err
 	}
-	if !r.ValidResponseAuthenticatorAndMessageAuthenticator(sd.Header.Authenticator, s.sharedSecret) {
-		return nil, errors.New("invalid response authenticators")
+	if !validResponseAndMessageAuthenticator(rd, sd.Header.Authenticator, s.sharedSecret) {
+		return fmt.Errorf("invalid RADIUS response authenticators")
 	}
-	return r, nil
+	return nil
+}
+
+func validResponseAndMessageAuthenticator(d *Datagram, reqauth [16]byte, secret string) bool {
+	swap(d.Header.Authenticator[:], reqauth[:])
+
+	maValid := true
+	if ma := d.FirstAttribute(AttributeTypeMessageAuthenticator); ma != nil {
+		if len(ma.Value) != md5.Size {
+			return false
+		}
+		old := make([]byte, md5.Size)
+		for i := 0; i < md5.Size; i++ {
+			old[i] = ma.Value[i]
+			ma.Value[i] = 0
+		}
+
+		mac := hmac.New(md5.New, []byte(secret))
+		_, err := d.WriteTo(mac)
+		if err != nil {
+			return false
+		}
+		sum := mac.Sum(nil)
+		copy(ma.Value, sum)
+		maValid = subtle.ConstantTimeCompare(sum, old) == 1
+	}
+
+	hash := md5.New()
+	_, err := d.WriteTo(hash)
+	if err != nil {
+		panic(err)
+	}
+	hash.Write([]byte(secret))
+	sum := hash.Sum(nil)
+	return maValid && subtle.ConstantTimeCompare(sum, reqauth[:]) == 1
+}
+
+func validRequestMessageAuthenticator(d *Datagram, ss string) bool {
+	ma := d.FirstAttribute(AttributeTypeMessageAuthenticator)
+	if ma == nil {
+		return true
+	}
+
+	if len(ma.Value) != md5.Size {
+		return false
+	}
+	old := make([]byte, md5.Size)
+	for i := 0; i < md5.Size; i++ {
+		old[i] = ma.Value[i]
+		ma.Value[i] = 0
+	}
+
+	mac := hmac.New(md5.New, []byte(ss))
+	_, err := d.WriteTo(mac)
+	if err != nil {
+		return false
+	}
+	sum := mac.Sum(nil)
+	copy(ma.Value, sum)
+	return subtle.ConstantTimeCompare(sum, old) == 1
 }
 
 func randUint8() uint8 {

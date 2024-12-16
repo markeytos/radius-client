@@ -29,13 +29,12 @@ func NewAccountingSession(conn net.Conn, ss string, timeout time.Duration, retri
 }
 
 func (s *AccountingSession) Status() error {
-	sd, err := s.createDatagram(CodeStatusServer, AttributeMap{AttributeTypeMessageAuthenticator: ""})
-	if err != nil {
-		return fmt.Errorf("failed to create datagram: %w", err)
-	}
-	s.identifier++
-
-	rd, err := s.sendReceiveDatagram(sd)
+	sd := s.newRequestDatagram(
+		CodeStatusServer,
+		newEmptyMessageAuthenticator(),
+	)
+	rd := &Datagram{}
+	err := s.WriteReadDatagram(sd, rd)
 	if err != nil {
 		return fmt.Errorf("failed to carry out status round: %w", err)
 	}
