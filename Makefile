@@ -1,4 +1,7 @@
-./bin/radius-client: ./radius/*.go
+GO_DIRS=$(shell find . -type d)
+GO_FILES=$(shell find . -type f -name '*.go')
+
+./bin/radius-client: $(GO_DIRS) $(GO_FILES)
 	@mkdir -p bin
 	go build -o ./bin/radius-client
 

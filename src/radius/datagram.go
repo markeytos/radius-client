@@ -32,7 +32,7 @@ const (
 
 type Datagram struct {
 	Header     *Header
-	Attributes []*Attribute
+	Attributes Attributes
 }
 
 func newDatagram(h *Header, attrs []*Attribute) *Datagram {
@@ -121,19 +121,6 @@ func (d Datagram) WriteTo(w io.Writer) (int64, error) {
 	}
 	n, err := w.Write(b.Bytes())
 	return int64(n), err
-}
-
-func (d *Datagram) FirstAttribute(t AttributeType) *Attribute {
-	for _, a := range d.Attributes {
-		if a.Type == t {
-			return a
-		}
-	}
-	return nil
-}
-
-func (d *Datagram) ContainsAttribute(t AttributeType) bool {
-	return d.FirstAttribute(t) != nil
 }
 
 type Header struct {

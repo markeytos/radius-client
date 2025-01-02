@@ -10,11 +10,11 @@ import (
 )
 
 type EapAuthenticationTunnel struct {
-	AuthenticationSession
+	*AuthenticationSession
 	AnonymousUsername string
 }
 
-func NewEapAuthenticationTunnel(session AuthenticationSession, anonymousUsername string) *EapAuthenticationTunnel {
+func NewEapAuthenticationTunnel(session *AuthenticationSession, anonymousUsername string) *EapAuthenticationTunnel {
 	session.sendAttributes = append(
 		session.sendAttributes,
 		newAttribute(AttributeTypeUserName, []byte(anonymousUsername)),
@@ -28,13 +28,16 @@ func NewEapAuthenticationTunnel(session AuthenticationSession, anonymousUsername
 
 func (t *EapAuthenticationTunnel) Write(b []byte) (n int, err error) {
 	n = 0
-	var sd *Datagram
+	var wd *Datagram
 	// rd := &Datagram{}
 
 	r := bytes.NewReader(b)
 	if r.Len() == 0 {
-		sd = t.newRequestDatagram(CodeAccessRequest, newAttribute(AttributeTypeEapMessage, nil))
-		return t.WriteDatagram(sd)
+		wd, err = t.newRequestDatagram(CodeAccessRequest, newAttribute(AttributeTypeEapMessage, nil))
+		if err != nil {
+			return
+		}
+		return t.WriteDatagram(wd)
 	}
 
 	var eapmsgs []*Attribute
@@ -48,8 +51,11 @@ func (t *EapAuthenticationTunnel) Write(b []byte) (n int, err error) {
 		}
 		eapmsgs = append(eapmsgs, newAttribute(AttributeTypeEapMessage, buf[:rcount]))
 	}
-	sd = t.newRequestDatagram(CodeAccessRequest, eapmsgs...)
-	n, err = t.WriteDatagram(sd)
+	wd, err = t.newRequestDatagram(CodeAccessRequest, eapmsgs...)
+	if err != nil {
+		return
+	}
+	n, err = t.WriteDatagram(wd)
 	return
 }
 

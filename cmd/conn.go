@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/markeytos/radius-client/radius"
+	"github.com/markeytos/radius-client/src/radius"
 )
 
 const (

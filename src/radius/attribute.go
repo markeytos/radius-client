@@ -51,20 +51,20 @@ func newUserPasswordAttribute(password, secret string, authenticator []byte) *At
 	pw := []byte(password)
 	enc := make([]byte, 0, ((len(pw)-1)|(15))+1)
 
-	hash := md5.New()
-	hash.Write(s)
-	hash.Write(authenticator)
-	enc = hash.Sum(enc)
+	h := md5.New()
+	h.Write(s)
+	h.Write(authenticator)
+	enc = h.Sum(enc)
 
 	for i := 0; i < 16 && i < len(pw); i++ {
 		enc[i] ^= pw[i]
 	}
 
 	for i := 16; i < len(pw); i += 16 {
-		hash.Reset()
-		hash.Write(s)
-		hash.Write(enc[i-16 : i])
-		enc = hash.Sum(enc)
+		h.Reset()
+		h.Write(s)
+		h.Write(enc[i-16 : i])
+		enc = h.Sum(enc)
 		for j := 0; j < 16 && i+j < len(pw); j++ {
 			enc[i+j] ^= pw[i+j]
 		}
@@ -188,6 +188,21 @@ func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 		}
 	}
 	return attrs, nil
+}
+
+type Attributes []*Attribute
+
+func (as Attributes) FirstOfType(t AttributeType) *Attribute {
+	for _, a := range as {
+		if a.Type == t {
+			return a
+		}
+	}
+	return nil
+}
+
+func (as *Attributes) ContainsOfType(t AttributeType) bool {
+	return as.FirstOfType(t) != nil
 }
 
 type AttributeType uint8

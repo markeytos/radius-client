@@ -6,7 +6,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/markeytos/radius-client/radius"
+	"github.com/markeytos/radius-client/src/radius"
 	"github.com/spf13/cobra"
 )
 

@@ -26,6 +26,7 @@ type baseSession struct {
 	sendAttributes      []*Attribute
 	replyOnceAttributes []*Attribute
 	lastReadDatagram    *Datagram
+	lastWrittenDatagram *Datagram
 }
 
 func (s *baseSession) newRequestHeader(c Code) *Header {
@@ -42,33 +43,38 @@ func (s *baseSession) newRequestHeader(c Code) *Header {
 	return h
 }
 
-func (s *baseSession) newRequestDatagram(c Code, attrs ...*Attribute) *Datagram {
+func (s *baseSession) newRequestDatagram(c Code, attrs ...*Attribute) (*Datagram, error) {
 	h := s.newRequestHeader(c)
 	return s.newDatagram(h, attrs...)
 }
 
-func (s *baseSession) newDatagram(h *Header, attrs ...*Attribute) *Datagram {
+func (s *baseSession) newDatagram(h *Header, attrs ...*Attribute) (*Datagram, error) {
+	var err error
 	attrs = append(attrs, s.sendAttributes...)
 	if s.replyOnceAttributes != nil {
 		attrs = append(attrs, s.replyOnceAttributes...)
 		s.replyOnceAttributes = nil
 	}
 	d := newDatagram(h, attrs)
-	if ma := d.FirstAttribute(AttributeTypeMessageAuthenticator); ma != nil {
-		writeMessageAuthenticator(d, ma, s.sharedSecret)
+	if ma := d.Attributes.FirstOfType(AttributeTypeMessageAuthenticator); ma != nil {
+		err = writeMessageAuthenticator(d, ma, s.sharedSecret)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return d
+	return d, nil
 }
 
-func (s *baseSession) WriteDatagram(sd *Datagram) (int, error) {
+func (s *baseSession) WriteDatagram(wd *Datagram) (int, error) {
 	err := s.conn.SetWriteDeadline(time.Now().Add(s.timeout))
 	if err != nil {
 		return 0, fmt.Errorf("error setting send deadline: %w", err)
 	}
-	n, err := sd.WriteTo(s.conn)
+	n, err := wd.WriteTo(s.conn)
 	if err != nil {
 		return int(n), fmt.Errorf("error sending RADIUS datagram: %w", err)
 	}
+	s.lastWrittenDatagram = wd
 	return int(n), nil
 }
 
@@ -91,10 +97,10 @@ func (s *baseSession) ReadDatagram(rd *Datagram) (int, error) {
 	return int(n), nil
 }
 
-func (s *baseSession) WriteReadDatagram(sd *Datagram, rd *Datagram) error {
+func (s *baseSession) WriteReadDatagram(wd *Datagram, rd *Datagram) error {
 	attempts := 0
 retry:
-	_, err := s.WriteDatagram(sd)
+	_, err := s.WriteDatagram(wd)
 	if err != nil {
 		return err
 	}
@@ -107,7 +113,7 @@ retry:
 		}
 		return err
 	}
-	if !validResponseAndMessageAuthenticator(rd, sd.Header.Authenticator, s.sharedSecret) {
+	if !validResponseAndMessageAuthenticator(rd, wd.Header.Authenticator, s.sharedSecret) {
 		return fmt.Errorf("invalid RADIUS response authenticators")
 	}
 	return nil
@@ -117,7 +123,7 @@ func validResponseAndMessageAuthenticator(d *Datagram, reqauth [16]byte, secret 
 	swap(d.Header.Authenticator[:], reqauth[:])
 
 	maValid := true
-	if ma := d.FirstAttribute(AttributeTypeMessageAuthenticator); ma != nil {
+	if ma := d.Attributes.FirstOfType(AttributeTypeMessageAuthenticator); ma != nil {
 		if len(ma.Value) != md5.Size {
 			return false
 		}
@@ -147,30 +153,30 @@ func validResponseAndMessageAuthenticator(d *Datagram, reqauth [16]byte, secret 
 	return maValid && subtle.ConstantTimeCompare(sum, reqauth[:]) == 1
 }
 
-func validRequestMessageAuthenticator(d *Datagram, ss string) bool {
-	ma := d.FirstAttribute(AttributeTypeMessageAuthenticator)
-	if ma == nil {
-		return true
-	}
-
-	if len(ma.Value) != md5.Size {
-		return false
-	}
-	old := make([]byte, md5.Size)
-	for i := 0; i < md5.Size; i++ {
-		old[i] = ma.Value[i]
-		ma.Value[i] = 0
-	}
-
-	mac := hmac.New(md5.New, []byte(ss))
-	_, err := d.WriteTo(mac)
-	if err != nil {
-		return false
-	}
-	sum := mac.Sum(nil)
-	copy(ma.Value, sum)
-	return subtle.ConstantTimeCompare(sum, old) == 1
-}
+// func validRequestMessageAuthenticator(d *Datagram, ss string) bool {
+// 	ma := d.FirstAttributeOfType(AttributeTypeMessageAuthenticator)
+// 	if ma == nil {
+// 		return true
+// 	}
+//
+// 	if len(ma.Value) != md5.Size {
+// 		return false
+// 	}
+// 	old := make([]byte, md5.Size)
+// 	for i := 0; i < md5.Size; i++ {
+// 		old[i] = ma.Value[i]
+// 		ma.Value[i] = 0
+// 	}
+//
+// 	mac := hmac.New(md5.New, []byte(ss))
+// 	_, err := d.WriteTo(mac)
+// 	if err != nil {
+// 		return false
+// 	}
+// 	sum := mac.Sum(nil)
+// 	copy(ma.Value, sum)
+// 	return subtle.ConstantTimeCompare(sum, old) == 1
+// }
 
 func randUint8() uint8 {
 	id, err := rand.Int(rand.Reader, big.NewInt(256))

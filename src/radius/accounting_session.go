@@ -29,12 +29,16 @@ func NewAccountingSession(conn net.Conn, ss string, timeout time.Duration, retri
 }
 
 func (s *AccountingSession) Status() error {
-	sd := s.newRequestDatagram(
+	wd, err := s.newRequestDatagram(
 		CodeStatusServer,
 		newEmptyMessageAuthenticator(),
 	)
+	if err != nil {
+		return err
+	}
+
 	rd := &Datagram{}
-	err := s.WriteReadDatagram(sd, rd)
+	err = s.WriteReadDatagram(wd, rd)
 	if err != nil {
 		return fmt.Errorf("failed to carry out status round: %w", err)
 	}
@@ -42,7 +46,7 @@ func (s *AccountingSession) Status() error {
 	if rd.Header.Code != CodeAccountingResponse {
 		return fmt.Errorf("invalid status response code: %s", rd.Header.Code.String())
 	}
-	if !rd.ContainsAttribute(AttributeTypeMessageAuthenticator) {
+	if !rd.Attributes.ContainsOfType(AttributeTypeMessageAuthenticator) {
 		return errors.New("missing message authenticator in response")
 	}
 	return nil

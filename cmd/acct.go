@@ -26,7 +26,7 @@ var acctUdpCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
-		return errors.New("not implemented")
+		return errors.New("UDP accounting not implemented")
 	},
 	SilenceUsage: true,
 }
@@ -40,7 +40,7 @@ var acctTlsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
-		return errors.New("not implemented")
+		return errors.New("TLS accounting not implemented")
 	},
 	SilenceUsage: true,
 }

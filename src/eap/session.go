@@ -19,6 +19,7 @@ type Session struct {
 	AnonymousUsername string
 	identifier        uint8
 	lastReadDatagram  *Datagram
+	RecvKey, SendKey  []byte
 }
 
 func NewSession(tunnel io.ReadWriter, anonymousUname string, eapSendStart bool) Session {
@@ -45,21 +46,12 @@ func (s *Session) newDatagram(cont *Content) *Datagram {
 	return newDatagram(h, cont)
 }
 
-func (s *Session) MsCHAPv2(uname, pw string) error {
-	err := s.start(TypeMsCHAPv2)
-	if err != nil {
-		return err
-	}
-	// use s.lastReadDatagram to get mschapv2 stuff & more
-	return errors.New("not implemented")
-}
-
 func (s *Session) TLS() error {
 	err := s.start(TypeTLS)
 	if err != nil {
 		return err
 	}
-	return errors.New("not implemented")
+	return errors.New("EAP-TLS not implemented")
 }
 
 func (s *Session) TtlsPAP(uname, pw string) error {
@@ -67,7 +59,7 @@ func (s *Session) TtlsPAP(uname, pw string) error {
 	if err != nil {
 		return err
 	}
-	return errors.New("not implemented")
+	return errors.New("EAP-TTLS/PAP not implemented")
 }
 
 func (s *Session) TtlsEapMsCHAPv2(uname, pw string) error {
@@ -75,7 +67,7 @@ func (s *Session) TtlsEapMsCHAPv2(uname, pw string) error {
 	if err != nil {
 		return err
 	}
-	return errors.New("not implemented")
+	return errors.New("EAP-TTLS/EAP-MS-CHAPv2 not implemented")
 }
 
 func (s *Session) TtlsEapTLS() error {
@@ -83,7 +75,7 @@ func (s *Session) TtlsEapTLS() error {
 	if err != nil {
 		return err
 	}
-	return errors.New("not implemented")
+	return errors.New("EAP-TTLS/EAP-TLS not implemented")
 }
 
 func (s *Session) PeapMsCHAPv2(uname, pw string) error {
@@ -91,18 +83,18 @@ func (s *Session) PeapMsCHAPv2(uname, pw string) error {
 	if err != nil {
 		return err
 	}
-	return errors.New("not implemented")
+	return errors.New("PEAP/MS-CHAPv2 not implemented")
 }
 
-func (s Session) WriteDatagram(sd Datagram) (int, error) {
-	n, err := sd.WriteTo(s.Tunnel)
+func (s Session) WriteDatagram(wd *Datagram) (int, error) {
+	n, err := wd.WriteTo(s.Tunnel)
 	if err != nil {
 		return int(n), fmt.Errorf("error sending EAP datagram: %w", err)
 	}
 	return int(n), nil
 }
 
-func (s Session) ReadDatagram(rd *Datagram) (int, error) {
+func (s *Session) ReadDatagram(rd *Datagram) (int, error) {
 	n, err := rd.ReadFrom(s.Tunnel)
 	if err != nil {
 		return int(n), fmt.Errorf("error receiving EAP datagram: %w", err)
@@ -111,8 +103,8 @@ func (s Session) ReadDatagram(rd *Datagram) (int, error) {
 	return int(n), nil
 }
 
-func (s *Session) WriteReadDatagram(sd Datagram, rd *Datagram) error {
-	_, err := s.WriteDatagram(sd)
+func (s *Session) WriteReadDatagram(wd *Datagram, rd *Datagram) error {
+	_, err := s.WriteDatagram(wd)
 	if err != nil {
 		return err
 	}
@@ -143,8 +135,8 @@ func (s *Session) start(targetType Type) error {
 		Type: TypeIdentity,
 		Data: []byte(s.AnonymousUsername),
 	}
-	sd := s.newDatagram(id)
-	err := s.WriteReadDatagram(*sd, rd)
+	wd := s.newDatagram(id)
+	err := s.WriteReadDatagram(wd, rd)
 	if err != nil {
 		return err
 	}
@@ -159,13 +151,13 @@ func (s *Session) start(targetType Type) error {
 			Type: TypeNAK,
 			Data: []byte{byte(targetType)},
 		}
-		sd = s.newDatagram(nak)
-		err = s.WriteReadDatagram(*sd, rd)
+		wd = s.newDatagram(nak)
+		err = s.WriteReadDatagram(wd, rd)
 		if err != nil {
 			return err
 		}
 		if rd.Header.Code != CodeRequest || rd.Content == nil || rd.Content.Type != targetType {
-			return fmt.Errorf("got %s: failed to negotiate the target EAP type", sd.Header.Code.String())
+			return fmt.Errorf("got %s: failed to negotiate the target EAP type", wd.Header.Code.String())
 		}
 	}
 	return nil
