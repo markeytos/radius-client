@@ -9,7 +9,7 @@ checks:
 	go fmt ./...
 	go vet ./...
 	go mod tidy
-	golangci-lint run
+	golangci-lint run -e 'golang.org/x/crypto/md4'
 
 clean:
 	rm -rf bin
