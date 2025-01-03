@@ -27,7 +27,7 @@ var statusUdpAuthCmd = &cobra.Command{
 		defer session.Close()
 		err = session.Status()
 		if err == nil {
-			println("Successful status")
+			println("Successful status UDP authentication")
 		}
 		return err
 	},
@@ -46,7 +46,7 @@ var statusUdpAcctCmd = &cobra.Command{
 		defer session.Close()
 		err = session.Status()
 		if err == nil {
-			println("Successful status")
+			println("Successful status over UDP accounting")
 		}
 		return err
 	},
@@ -65,7 +65,7 @@ var statusTlsCmd = &cobra.Command{
 		defer session.Close()
 		err = session.Status()
 		if err == nil {
-			println("Successful status")
+			println("Successful TLS status")
 		}
 		return err
 	},

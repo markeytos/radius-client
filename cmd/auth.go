@@ -53,7 +53,11 @@ var authUdpCmd = &cobra.Command{
 			return fmt.Errorf("failed to create session: %w", err)
 		}
 		defer session.Close()
-		return auth_wrapper(session, args[2])
+		err = auth(session, args[2])
+		if err == nil {
+			fmt.Printf("Successful %s authentication over UDP\n", args[2])
+		}
+		return err
 	},
 	SilenceUsage: true,
 }
@@ -69,7 +73,11 @@ var authTlsCmd = &cobra.Command{
 			return fmt.Errorf("failed to create session: %w", err)
 		}
 		defer session.Close()
-		return auth_wrapper(session, args[3])
+		err = auth(session, args[3])
+		if err == nil {
+			fmt.Printf("Successful %s authentication over TLS\n", args[3])
+		}
+		return err
 	},
 	SilenceUsage: true,
 }
@@ -86,14 +94,6 @@ func init() {
 	authCmd.MarkFlagsRequiredTogether("username", "password")
 
 	authCmd.AddCommand(authUdpCmd, authTlsCmd)
-}
-
-func auth_wrapper(session *radius.AuthenticationSession, protocol string) error {
-	err := auth(session, protocol)
-	if err == nil {
-		fmt.Printf("Successful %s authentication\n", protocol)
-	}
-	return err
 }
 
 func auth(session *radius.AuthenticationSession, protocol string) error {
