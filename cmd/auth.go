@@ -30,6 +30,8 @@ var (
 	username          string
 	password          string
 	anonymousUsername string
+	clientCertificate string
+	caCertificate     string
 	eapSendStart      bool
 )
 
@@ -50,6 +52,7 @@ var authUdpCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
+		defer session.Close()
 		return auth_wrapper(session, args[2])
 	},
 	SilenceUsage: true,
@@ -65,6 +68,7 @@ var authTlsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
+		defer session.Close()
 		return auth_wrapper(session, args[3])
 	},
 	SilenceUsage: true,
@@ -75,6 +79,8 @@ func init() {
 	authCmd.PersistentFlags().StringVar(&username, "username", "", "Username")
 	authCmd.PersistentFlags().StringVar(&password, "password", "", "Password")
 	authCmd.PersistentFlags().StringVar(&anonymousUsername, "anonymous-username", "anonymous", "EAP anonymous username")
+	authCmd.PersistentFlags().StringVar(&clientCertificate, "client-cert", "", "Client certificate")
+	authCmd.PersistentFlags().StringVar(&caCertificate, "ca-cert", "", "CA certificate")
 	authCmd.PersistentFlags().BoolVar(&eapSendStart, "eap-send-start", false, "EAP send EAP-Start")
 
 	authCmd.MarkFlagsRequiredTogether("username", "password")
@@ -101,6 +107,7 @@ func auth(session *radius.AuthenticationSession, protocol string) error {
 		return errors.New("invalid authentication protocol picked")
 	}
 	eaptunnel := radius.NewEapAuthenticationTunnel(session, anonymousUsername)
+	defer eaptunnel.Close()
 	eapsession := eap.NewSession(eaptunnel, anonymousUsername, eapSendStart)
 	err := eapAuth(&eapsession, protocol)
 	if err != nil {
@@ -119,7 +126,11 @@ func eapAuth(session *eap.Session, protocol string) error {
 		}
 		return mschapv2.Authenticate()
 	case authEapTLS:
-		return session.TLS()
+		tls, err := eap.CreateTLS(session, clientCertificate, caCertificate)
+		if err != nil {
+			return err
+		}
+		return tls.Authenticate()
 	case authEapTtlsPAP:
 		return session.TtlsPAP(username, password)
 	case authEapTtlsEapMsCHAPv2:
@@ -140,9 +151,13 @@ func prerun(cmd *cobra.Command, args []string) error {
 		if macAddress == "" {
 			return errors.New("set MAC address to carry out MAC Authentication Bypass")
 		}
-	case authPAP, authEapMsCHAPv2, authEapTtlsPAP, authEapTtlsEapMsCHAPv2, authPeapMsCHAPv2:
+	case authPAP, authEapMsCHAPv2:
 		if username == "" || password == "" {
 			return errors.New("set username and password to carry out password-based protocol")
+		}
+	case authEapTLS:
+		if clientCertificate == "" || caCertificate == "" {
+			return errors.New("set client and CA certificate to carry out certificate-based authentication")
 		}
 	default:
 		return errors.New("invalid authentication protocol picked")

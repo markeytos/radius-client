@@ -17,8 +17,8 @@ import (
 )
 
 type baseSession struct {
+	net.Conn
 	identifier          uint8
-	conn                net.Conn
 	sharedSecret        string
 	timeout             time.Duration
 	retries             int
@@ -66,11 +66,11 @@ func (s *baseSession) newDatagram(h *Header, attrs ...*Attribute) (*Datagram, er
 }
 
 func (s *baseSession) WriteDatagram(wd *Datagram) (int, error) {
-	err := s.conn.SetWriteDeadline(time.Now().Add(s.timeout))
+	err := s.SetWriteDeadline(time.Now().Add(s.timeout))
 	if err != nil {
 		return 0, fmt.Errorf("error setting send deadline: %w", err)
 	}
-	n, err := wd.WriteTo(s.conn)
+	n, err := wd.WriteTo(s)
 	if err != nil {
 		return int(n), fmt.Errorf("error sending RADIUS datagram: %w", err)
 	}
@@ -79,11 +79,11 @@ func (s *baseSession) WriteDatagram(wd *Datagram) (int, error) {
 }
 
 func (s *baseSession) ReadDatagram(rd *Datagram) (int, error) {
-	err := s.conn.SetReadDeadline(time.Now().Add(s.timeout))
+	err := s.SetReadDeadline(time.Now().Add(s.timeout))
 	if err != nil {
 		return 0, fmt.Errorf("error setting receive deadline: %w", err)
 	}
-	n, err := rd.ReadFrom(s.conn)
+	n, err := rd.ReadFrom(s)
 	if err != nil {
 		return int(n), fmt.Errorf("error receiving RADIUS datagram: %w", err)
 	}

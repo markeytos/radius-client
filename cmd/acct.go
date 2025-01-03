@@ -22,10 +22,11 @@ var acctUdpCmd = &cobra.Command{
 	Short: "RADIUS/UDP client accounting",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, err := newUDPAcctSession(args[0], args[1])
+		session, err := newUDPAcctSession(args[0], args[1])
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
+		defer session.Close()
 		return errors.New("UDP accounting not implemented")
 	},
 	SilenceUsage: true,
@@ -36,10 +37,11 @@ var acctTlsCmd = &cobra.Command{
 	Short: "RADIUS/TLS client accounting",
 	Args:  cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, err := newTLSAcctSession(args[0], args[1], args[2])
+		session, err := newTLSAcctSession(args[0], args[1], args[2])
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
+		defer session.Close()
 		return errors.New("TLS accounting not implemented")
 	},
 	SilenceUsage: true,

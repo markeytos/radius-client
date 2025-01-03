@@ -19,8 +19,8 @@ type AccountingSession struct {
 func NewAccountingSession(conn net.Conn, ss string, timeout time.Duration, retries int) *AccountingSession {
 	return &AccountingSession{
 		baseSession: baseSession{
+			Conn:         conn,
 			identifier:   randUint8(),
-			conn:         conn,
 			sharedSecret: ss,
 			timeout:      timeout,
 			retries:      retries,

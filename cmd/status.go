@@ -24,6 +24,7 @@ var statusUdpAuthCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
+		defer session.Close()
 		err = session.Status()
 		if err == nil {
 			println("Successful status")
@@ -42,6 +43,7 @@ var statusUdpAcctCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
+		defer session.Close()
 		err = session.Status()
 		if err == nil {
 			println("Successful status")
@@ -60,6 +62,7 @@ var statusTlsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
+		defer session.Close()
 		err = session.Status()
 		if err == nil {
 			println("Successful status")

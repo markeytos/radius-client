@@ -25,8 +25,8 @@ func NewAuthenticationSession(conn net.Conn, ss string, timeout time.Duration, r
 	}
 	return &AuthenticationSession{
 		baseSession: baseSession{
+			Conn:           conn,
 			identifier:     randUint8(),
-			conn:           conn,
 			sharedSecret:   ss,
 			timeout:        timeout,
 			retries:        retries,

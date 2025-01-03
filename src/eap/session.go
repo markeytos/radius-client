@@ -46,14 +46,6 @@ func (s *Session) newDatagram(cont *Content) *Datagram {
 	return newDatagram(h, cont)
 }
 
-func (s *Session) TLS() error {
-	err := s.start(TypeTLS)
-	if err != nil {
-		return err
-	}
-	return errors.New("EAP-TLS not implemented")
-}
-
 func (s *Session) TtlsPAP(uname, pw string) error {
 	err := s.start(TypeTTLS)
 	if err != nil {
