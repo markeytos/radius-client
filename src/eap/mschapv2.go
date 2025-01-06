@@ -26,7 +26,7 @@ func (s *MsCHAPv2) Authenticate() error {
 	if s.lastReadDatagram.Content.Type != TypeMsCHAPv2 {
 		return fmt.Errorf("expected EAP packet of type MS-CHAPv2")
 	}
-	c, err := mschapv2.ReadChallenge(s.lastReadDatagram.Content.Data)
+	c, err := mschapv2.CreateChallengeFromBuffer(s.lastReadDatagram.Content.Data)
 	if err != nil {
 		return err
 	}

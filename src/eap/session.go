@@ -9,20 +9,30 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
+	"net"
 )
 
 type Session struct {
-	Tunnel            io.ReadWriter
+	Tunnel            net.Conn
 	EAPSendStart      bool
 	AnonymousUsername string
 	identifier        uint8
+	lastAction        sessionLastAction
 	lastReadDatagram  *Datagram
 	RecvKey, SendKey  []byte
 }
 
-func NewSession(tunnel io.ReadWriter, anonymousUname string, eapSendStart bool) Session {
+type sessionLastAction int
+
+const (
+	sessionLastActionNone sessionLastAction = iota
+	sessionLastActionWriteDatagram
+	sessionLastActionReadDatagram
+	sessionLastActionError
+)
+
+func NewSession(tunnel net.Conn, anonymousUname string, eapSendStart bool) Session {
 	return Session{
 		Tunnel:            tunnel,
 		EAPSendStart:      eapSendStart,
@@ -78,20 +88,38 @@ func (s *Session) PeapMsCHAPv2(uname, pw string) error {
 	return errors.New("PEAP/MS-CHAPv2 not implemented")
 }
 
-func (s Session) WriteDatagram(wd *Datagram) (int, error) {
+func (s *Session) WriteDatagram(wd *Datagram) (int, error) {
+	switch s.lastAction {
+	case sessionLastActionNone, sessionLastActionReadDatagram:
+		break
+	default:
+		s.lastAction = sessionLastActionError
+		return 0, fmt.Errorf("out of order write: invalid last action")
+	}
 	n, err := wd.WriteTo(s.Tunnel)
 	if err != nil {
+		s.lastAction = sessionLastActionError
 		return int(n), fmt.Errorf("error sending EAP datagram: %w", err)
 	}
+	s.lastAction = sessionLastActionWriteDatagram
 	return int(n), nil
 }
 
 func (s *Session) ReadDatagram(rd *Datagram) (int, error) {
+	switch s.lastAction {
+	case sessionLastActionNone, sessionLastActionWriteDatagram:
+		break
+	default:
+		s.lastAction = sessionLastActionError
+		return 0, fmt.Errorf("out of order read: invalid last action")
+	}
 	n, err := rd.ReadFrom(s.Tunnel)
 	if err != nil {
+		s.lastAction = sessionLastActionError
 		return int(n), fmt.Errorf("error receiving EAP datagram: %w", err)
 	}
 	s.lastReadDatagram = rd
+	s.lastAction = sessionLastActionReadDatagram
 	return int(n), nil
 }
 

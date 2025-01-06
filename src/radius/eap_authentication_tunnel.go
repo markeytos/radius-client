@@ -8,7 +8,15 @@ package radius
 import (
 	"bytes"
 	"fmt"
+	"net"
+	"time"
 )
+
+type EapAuthenticationTunnel struct {
+	session           *AuthenticationSession
+	anonymousUsername string
+	lastAction        eapAuthenticationTunnelLastAction
+}
 
 type eapAuthenticationTunnelLastAction int
 
@@ -19,12 +27,6 @@ const (
 	eapAuthenticationTunnelLastActionError
 	eapAuthenticationTunnelLastActionClose
 )
-
-type EapAuthenticationTunnel struct {
-	session           *AuthenticationSession
-	anonymousUsername string
-	lastAction        eapAuthenticationTunnelLastAction
-}
 
 func NewEapAuthenticationTunnel(session *AuthenticationSession, anonymousUsername string) *EapAuthenticationTunnel {
 	session.sendAttributes = append(
@@ -38,19 +40,19 @@ func NewEapAuthenticationTunnel(session *AuthenticationSession, anonymousUsernam
 	}
 }
 
-func (t *EapAuthenticationTunnel) Read(b []byte) (n int, err error) {
-	switch t.lastAction {
+func (tt *EapAuthenticationTunnel) Read(b []byte) (n int, err error) {
+	switch tt.lastAction {
 	case eapAuthenticationTunnelLastActionNone, eapAuthenticationTunnelLastActionWritePacket:
 		break
 	default:
-		t.lastAction = eapAuthenticationTunnelLastActionError
+		tt.lastAction = eapAuthenticationTunnelLastActionError
 		return 0, fmt.Errorf("out of order read: invalid last action")
 	}
 	n = 0
 	rd := &Datagram{}
-	_, err = t.session.ReadDatagram(rd)
+	_, err = tt.session.ReadDatagram(rd)
 	if err != nil {
-		t.lastAction = eapAuthenticationTunnelLastActionError
+		tt.lastAction = eapAuthenticationTunnelLastActionError
 		return
 	}
 	for _, a := range rd.Attributes {
@@ -59,54 +61,73 @@ func (t *EapAuthenticationTunnel) Read(b []byte) (n int, err error) {
 		}
 		n += copy(b[n:], a.Value)
 	}
-	t.lastAction = eapAuthenticationTunnelLastActionReadPacket
+	tt.lastAction = eapAuthenticationTunnelLastActionReadPacket
 	return
 }
 
-func (t *EapAuthenticationTunnel) Write(b []byte) (n int, err error) {
-	switch t.lastAction {
+func (tt *EapAuthenticationTunnel) Write(b []byte) (n int, err error) {
+	switch tt.lastAction {
 	case eapAuthenticationTunnelLastActionNone, eapAuthenticationTunnelLastActionReadPacket:
 		break
 	default:
-		t.lastAction = eapAuthenticationTunnelLastActionError
+		tt.lastAction = eapAuthenticationTunnelLastActionError
 		return 0, fmt.Errorf("out of order read: invalid last action")
 	}
 	n = 0
 	var wd *Datagram
 	if len(b) == 0 {
-		wd, err = t.session.newRequestDatagram(CodeAccessRequest, newAttribute(AttributeTypeEapMessage, nil))
+		wd, err = tt.session.newRequestDatagram(CodeAccessRequest, newAttribute(AttributeTypeEapMessage, nil))
 		if err != nil {
-			t.lastAction = eapAuthenticationTunnelLastActionError
+			tt.lastAction = eapAuthenticationTunnelLastActionError
 			return
 		}
-		t.lastAction = eapAuthenticationTunnelLastActionWritePacket
-		return t.session.WriteDatagram(wd)
+		tt.lastAction = eapAuthenticationTunnelLastActionWritePacket
+		return tt.session.WriteDatagram(wd)
 	}
 
 	var eapmsgs []*Attribute
 	r := bytes.NewReader(b)
 	for r.Len() > 0 {
-		// TODO: handle too big EAP stuff
 		buf := make([]byte, maxAttributeLen)
 		rcount, err := r.Read(buf)
 		n += rcount
 		if err != nil {
-			t.lastAction = eapAuthenticationTunnelLastActionError
+			tt.lastAction = eapAuthenticationTunnelLastActionError
 			return n, err
 		}
 		eapmsgs = append(eapmsgs, newAttribute(AttributeTypeEapMessage, buf[:rcount]))
 	}
-	wd, err = t.session.newRequestDatagram(CodeAccessRequest, eapmsgs...)
+	wd, err = tt.session.newRequestDatagram(CodeAccessRequest, eapmsgs...)
 	if err != nil {
-		t.lastAction = eapAuthenticationTunnelLastActionError
+		tt.lastAction = eapAuthenticationTunnelLastActionError
 		return
 	}
-	t.lastAction = eapAuthenticationTunnelLastActionWritePacket
-	n, err = t.session.WriteDatagram(wd)
+	tt.lastAction = eapAuthenticationTunnelLastActionWritePacket
+	n, err = tt.session.WriteDatagram(wd)
 	return
 }
 
-func (t *EapAuthenticationTunnel) Close() error {
-	t.lastAction = eapAuthenticationTunnelLastActionClose
+func (tt *EapAuthenticationTunnel) Close() error {
+	tt.lastAction = eapAuthenticationTunnelLastActionClose
 	return nil
+}
+
+func (tt EapAuthenticationTunnel) LocalAddr() net.Addr {
+	return tt.session.LocalAddr()
+}
+
+func (tt EapAuthenticationTunnel) RemoteAddr() net.Addr {
+	return tt.session.RemoteAddr()
+}
+
+func (tt *EapAuthenticationTunnel) SetDeadline(t time.Time) error {
+	return tt.SetDeadline(t)
+}
+
+func (tt *EapAuthenticationTunnel) SetReadDeadline(t time.Time) error {
+	return tt.SetReadDeadline(t)
+}
+
+func (tt *EapAuthenticationTunnel) SetWriteDeadline(t time.Time) error {
+	return tt.SetWriteDeadline(t)
 }

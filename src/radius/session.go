@@ -108,7 +108,6 @@ retry:
 	if err != nil {
 		attempts++
 		if attempts < s.retries {
-			println("retry at sending due to no reply")
 			goto retry
 		}
 		return err
