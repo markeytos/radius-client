@@ -32,6 +32,7 @@ var (
 	anonymousUsername string
 	clientCertificate string
 	caCertificate     string
+	tlsVersion        string
 	eapSendStart      bool
 )
 
@@ -89,6 +90,7 @@ func init() {
 	authCmd.PersistentFlags().StringVar(&anonymousUsername, "anonymous-username", "anonymous", "EAP anonymous username")
 	authCmd.PersistentFlags().StringVar(&clientCertificate, "client-cert", "", "Client certificate")
 	authCmd.PersistentFlags().StringVar(&caCertificate, "ca-cert", "", "CA certificate")
+	authCmd.PersistentFlags().StringVar(&tlsVersion, "tls-version", "1.2", "TLS version underlying TLS-based protocols")
 	authCmd.PersistentFlags().BoolVar(&eapSendStart, "eap-send-start", false, "EAP send EAP-Start")
 
 	authCmd.MarkFlagsRequiredTogether("username", "password")
@@ -126,7 +128,7 @@ func eapAuth(session *eap.Session, protocol string) error {
 		}
 		return mschapv2.Authenticate()
 	case authEapTLS:
-		tls, err := eap.CreateTLS(session, clientCertificate, caCertificate)
+		tls, err := eap.CreateTLS(session, clientCertificate, caCertificate, tlsVersion)
 		if err != nil {
 			return err
 		}

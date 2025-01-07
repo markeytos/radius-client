@@ -79,11 +79,22 @@ func (s *baseSession) WriteDatagram(wd *Datagram) (int, error) {
 }
 
 func (s *baseSession) ReadDatagram(rd *Datagram) (int, error) {
-	err := s.SetReadDeadline(time.Now().Add(s.timeout))
-	if err != nil {
-		return 0, fmt.Errorf("error setting receive deadline: %w", err)
+	var n int64
+	var err error
+	for range s.retries {
+		err = s.SetReadDeadline(time.Now().Add(s.timeout))
+		if err != nil {
+			return 0, fmt.Errorf("error setting receive deadline: %w", err)
+		}
+		n, err = rd.ReadFrom(s)
+		if err == nil {
+			break
+		}
+		_, werr := s.WriteDatagram(s.lastWrittenDatagram)
+		if werr != nil {
+			return 0, fmt.Errorf("error sending RADIUS datagram in receive retry: %w", werr)
+		}
 	}
-	n, err := rd.ReadFrom(s)
 	if err != nil {
 		return int(n), fmt.Errorf("error receiving RADIUS datagram: %w", err)
 	}
@@ -94,26 +105,20 @@ func (s *baseSession) ReadDatagram(rd *Datagram) (int, error) {
 			s.replyOnceAttributes = append(s.replyOnceAttributes, a)
 		}
 	}
+	if !validResponseAndMessageAuthenticator(rd, s.lastWrittenDatagram.Header.Authenticator, s.sharedSecret) {
+		return int(n), fmt.Errorf("invalid RADIUS response authenticators")
+	}
 	return int(n), nil
 }
 
 func (s *baseSession) WriteReadDatagram(wd *Datagram, rd *Datagram) error {
-	attempts := 0
-retry:
 	_, err := s.WriteDatagram(wd)
 	if err != nil {
 		return err
 	}
 	_, err = s.ReadDatagram(rd)
 	if err != nil {
-		attempts++
-		if attempts < s.retries {
-			goto retry
-		}
 		return err
-	}
-	if !validResponseAndMessageAuthenticator(rd, wd.Header.Authenticator, s.sharedSecret) {
-		return fmt.Errorf("invalid RADIUS response authenticators")
 	}
 	return nil
 }

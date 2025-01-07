@@ -44,6 +44,8 @@ func (tt *EapAuthenticationTunnel) Read(b []byte) (n int, err error) {
 	switch tt.lastAction {
 	case eapAuthenticationTunnelLastActionNone, eapAuthenticationTunnelLastActionWritePacket:
 		break
+	case eapAuthenticationTunnelLastActionClose:
+		return 0, fmt.Errorf("out of order read: session ended")
 	default:
 		tt.lastAction = eapAuthenticationTunnelLastActionError
 		return 0, fmt.Errorf("out of order read: invalid last action")
@@ -62,6 +64,12 @@ func (tt *EapAuthenticationTunnel) Read(b []byte) (n int, err error) {
 		n += copy(b[n:], a.Value)
 	}
 	tt.lastAction = eapAuthenticationTunnelLastActionReadPacket
+	switch rd.Header.Code {
+	case CodeAccessAccept, CodeAccessReject:
+		tt.lastAction = eapAuthenticationTunnelLastActionClose
+	default:
+		tt.lastAction = eapAuthenticationTunnelLastActionReadPacket
+	}
 	return
 }
 
@@ -69,9 +77,11 @@ func (tt *EapAuthenticationTunnel) Write(b []byte) (n int, err error) {
 	switch tt.lastAction {
 	case eapAuthenticationTunnelLastActionNone, eapAuthenticationTunnelLastActionReadPacket:
 		break
+	case eapAuthenticationTunnelLastActionClose:
+		return 0, fmt.Errorf("out of order write: session ended")
 	default:
 		tt.lastAction = eapAuthenticationTunnelLastActionError
-		return 0, fmt.Errorf("out of order read: invalid last action")
+		return 0, fmt.Errorf("out of order write: invalid last action")
 	}
 	n = 0
 	var wd *Datagram
@@ -121,13 +131,13 @@ func (tt EapAuthenticationTunnel) RemoteAddr() net.Addr {
 }
 
 func (tt *EapAuthenticationTunnel) SetDeadline(t time.Time) error {
-	return tt.SetDeadline(t)
+	return tt.session.SetDeadline(t)
 }
 
 func (tt *EapAuthenticationTunnel) SetReadDeadline(t time.Time) error {
-	return tt.SetReadDeadline(t)
+	return tt.session.SetReadDeadline(t)
 }
 
 func (tt *EapAuthenticationTunnel) SetWriteDeadline(t time.Time) error {
-	return tt.SetWriteDeadline(t)
+	return tt.session.SetWriteDeadline(t)
 }

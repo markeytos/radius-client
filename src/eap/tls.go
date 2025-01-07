@@ -22,9 +22,10 @@ type TLS struct {
 	rootCAs           *x509.CertPool
 	readBuffer        []byte
 	readMore          bool
+	tlsVersion        uint16
 }
 
-func CreateTLS(session *Session, clientCert, caCert string) (*TLS, error) {
+func CreateTLS(session *Session, clientCert, caCert, tlsVersion string) (*TLS, error) {
 	content, err := os.ReadFile(caCert)
 	if err != nil {
 		return nil, err
@@ -36,8 +37,22 @@ func CreateTLS(session *Session, clientCert, caCert string) (*TLS, error) {
 	if err != nil {
 		return nil, err
 	}
+	var tlsv uint16
+	switch tlsVersion {
+	case "1.2":
+		tlsv = tls.VersionTLS12
+	case "1.3":
+		tlsv = tls.VersionTLS13
+	default:
+		tlsv = tls.VersionTLS12
+	}
 
-	return &TLS{Session: session, clientCertificate: cert, rootCAs: rootCAs}, nil
+	return &TLS{
+		Session:           session,
+		clientCertificate: cert,
+		rootCAs:           rootCAs,
+		tlsVersion:        tlsv,
+	}, nil
 }
 
 func (tt *TLS) Authenticate() error {
@@ -50,7 +65,8 @@ func (tt *TLS) Authenticate() error {
 		RootCAs:            tt.rootCAs,
 		Certificates:       []tls.Certificate{tt.clientCertificate},
 		InsecureSkipVerify: true,
-		// MaxVersion:         tls.VersionTLS12,
+		MinVersion:         tt.tlsVersion,
+		MaxVersion:         tt.tlsVersion,
 	}
 	tc := tls.Client(tt, tlsConfig)
 	authErr := tc.Handshake()
