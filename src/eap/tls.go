@@ -79,15 +79,22 @@ func (tt *TLS) Authenticate(certpath string) error {
 	if err != nil {
 		return err
 	}
+	h, _, err := net.SplitHostPort(tt.RemoteAddr().String())
+	if err != nil {
+		return err
+	}
 	tlsConfig := &tls.Config{
-		RootCAs:            tt.rootCAs,
-		Certificates:       []tls.Certificate{cert},
-		InsecureSkipVerify: true,
-		MinVersion:         tt.tlsVersion,
-		MaxVersion:         tt.tlsVersion,
+		RootCAs:      tt.rootCAs,
+		Certificates: []tls.Certificate{cert},
+		ServerName:   h,
+		MinVersion:   tt.tlsVersion,
+		MaxVersion:   tt.tlsVersion,
 	}
 	tc := tls.Client(tt, tlsConfig)
-	authErr := tc.Handshake()
+	err = tc.Handshake()
+	if err != nil {
+		return err
+	}
 
 	wd := tt.newDatagram(&Content{Type: tt.packetType, Data: []byte{0}})
 	_, err = tt.WriteDatagram(wd)
@@ -109,14 +116,8 @@ func (tt *TLS) Authenticate(certpath string) error {
 	}
 
 	// extract key material
-	if authErr == nil {
-		tt.RecvKey, tt.SendKey, err = exportKeyingMaterial(tc, eapMasterKeyLabel)
-		if err != nil {
-			return err
-		}
-	}
-
-	return authErr
+	tt.RecvKey, tt.SendKey, err = exportKeyingMaterial(tc, eapMasterKeyLabel)
+	return err
 }
 
 func (tt *TLS) Read(b []byte) (int, error) {
