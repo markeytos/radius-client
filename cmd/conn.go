@@ -20,6 +20,11 @@ const (
 	defaultMTUSize = 1500
 )
 
+type statusSession interface {
+	net.Conn
+	Status() error
+}
+
 func dialUDP(ip string, port int) (net.Conn, error) {
 	d := net.Dialer{Timeout: 10 * time.Second}
 	return d.Dial("udp", fmt.Sprintf("%s:%d", ip, port))

@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/markeytos/radius-client/src/eap"
@@ -72,17 +73,9 @@ var authUdpCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(3),
 	PreRunE: prerun,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		session, err := newUDPAuthSession(args[0], args[1])
-		if err != nil {
-			return fmt.Errorf("auth: failed to create udp session: %w", err)
-		}
-		defer session.Close()
-		err = auth(session, args[2])
-		if err != nil {
-			return fmt.Errorf("auth: %w", err)
-		}
-		fmt.Printf("Successful %s authentication over UDP\n", args[2])
-		return nil
+		return auth(func() (*radius.AuthenticationSession, error) {
+			return newUDPAuthSession(args[0], args[1])
+		}, args[2])
 	},
 	SilenceUsage: true,
 }
@@ -93,17 +86,9 @@ var authTlsCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(4),
 	PreRunE: prerun,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		session, err := newTLSAuthSession(args[0], args[1], args[2])
-		if err != nil {
-			return fmt.Errorf("auth: failed to create tls session: %w", err)
-		}
-		defer session.Close()
-		err = auth(session, args[3])
-		if err != nil {
-			return fmt.Errorf("auth: %w", err)
-		}
-		fmt.Printf("Successful %s authentication over TLS\n", args[3])
-		return nil
+		return auth(func() (*radius.AuthenticationSession, error) {
+			return newTLSAuthSession(args[0], args[1], args[2])
+		}, args[3])
 	},
 	SilenceUsage: true,
 }
@@ -124,7 +109,38 @@ func init() {
 	authCmd.AddCommand(authUdpCmd, authTlsCmd)
 }
 
-func auth(session *radius.AuthenticationSession, protocol string) error {
+func auth(f func() (*radius.AuthenticationSession, error), protocol string) error {
+	session, err := f()
+	if err != nil {
+		slog.Error("failed to create session",
+			"command", "auth",
+			"protocol", protocol,
+			"error", err,
+		)
+		return err
+	}
+	defer session.Close()
+	err = internalAuth(session, protocol)
+	if err != nil {
+		slog.Error("failed auth",
+			"network", session.RemoteAddr().Network(),
+			"address", session.RemoteAddr(),
+			"command", "auth",
+			"protocol", protocol,
+			"error", err,
+		)
+		return err
+	}
+	slog.Info("successful authentication",
+		"network", session.RemoteAddr().Network(),
+		"address", session.RemoteAddr(),
+		"command", "auth",
+		"protocol", protocol,
+	)
+	return nil
+}
+
+func internalAuth(session *radius.AuthenticationSession, protocol string) error {
 	switch protocol {
 	case authMAB:
 		return session.MAB(macAddress)
@@ -134,6 +150,7 @@ func auth(session *radius.AuthenticationSession, protocol string) error {
 	if !strings.HasPrefix(protocol, "eap-") && !strings.HasPrefix(protocol, "peap-") {
 		return fmt.Errorf("unknown protocol picked: %s", protocol)
 	}
+
 	eaptunnel := radius.NewEapAuthenticationTunnel(session, anonymousUsername)
 	defer eaptunnel.Close()
 	eapsession := eap.NewSession(eaptunnel, anonymousUsername, eapSendStart)
