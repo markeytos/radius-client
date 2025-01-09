@@ -4,7 +4,6 @@ Copyright © 2024 Keytos alan@keytos.io
 package cmd
 
 import (
-	"crypto/tls"
 	"fmt"
 	"strings"
 
@@ -22,7 +21,7 @@ const (
 	authEapTtlsPAP         = "eap-ttls-pap"
 	authEapTtlsEapMsCHAPv2 = "eap-ttls-eap-ms-chapv2"
 	authEapTtlsEapTLS      = "eap-ttls-eap-tls"
-	authPeapMsCHAPv2       = "eap-peap-eap-ms-chapv2"
+	authPeapMsCHAPv2       = "peap-ms-chapv2"
 )
 
 // required values for protocols
@@ -132,13 +131,13 @@ func auth(session *radius.AuthenticationSession, protocol string) error {
 	case authPAP:
 		return session.PAP(username, password)
 	}
-	if !strings.HasPrefix(protocol, "eap-") {
+	if !strings.HasPrefix(protocol, "eap-") && !strings.HasPrefix(protocol, "peap-") {
 		return fmt.Errorf("unknown protocol picked: %s", protocol)
 	}
 	eaptunnel := radius.NewEapAuthenticationTunnel(session, anonymousUsername)
 	defer eaptunnel.Close()
 	eapsession := eap.NewSession(eaptunnel, anonymousUsername, eapSendStart)
-	err := eapAuth(&eapsession, protocol)
+	err := eapAuth(eapsession, protocol)
 	if err != nil {
 		return err
 	}
@@ -154,11 +153,7 @@ func eapAuth(session *eap.Session, protocol string) error {
 		if err != nil {
 			return err
 		}
-		cert, err := tls.LoadX509KeyPair(clientCertificate, clientCertificate)
-		if err != nil {
-			return err
-		}
-		return eaptls.Authenticate(cert)
+		return eaptls.Authenticate(clientCertificate)
 	case authEapTtlsPAP:
 		eapttls, err := eap.CreateTTLS(session, tunnelCACertificate, tlsVersion)
 		if err != nil {
@@ -166,12 +161,30 @@ func eapAuth(session *eap.Session, protocol string) error {
 		}
 		return eapttls.PAP(username, password)
 	case authEapTtlsEapMsCHAPv2:
-		eapttls, err := eap.CreateTTLS(session, tunnelCACertificate, tlsVersion)
+		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion)
 		if err != nil {
 			return err
 		}
-		tunnSession := eap.NewSession(eapttls, anonymousUsername, eapSendStart)
-		return tunnSession.MsCHAPv2(username, password)
+		ts := eap.NewSession(eapttls, anonymousUsername, false)
+		return ts.MsCHAPv2(username, password)
+	case authEapTtlsEapTLS:
+		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion)
+		if err != nil {
+			return err
+		}
+		ts := eap.NewSession(eapttls, anonymousUsername, false)
+		eaptls, err := eap.CreateTLS(ts, caCertificate, tlsVersion)
+		if err != nil {
+			return err
+		}
+		return eaptls.Authenticate(clientCertificate)
+	case authPeapMsCHAPv2:
+		peap, err := eap.CreatePEAP(session, tunnelCACertificate, tlsVersion)
+		if err != nil {
+			return err
+		}
+		ts := eap.NewSession(peap, anonymousUsername, true)
+		return ts.MsCHAPv2(username, password)
 	default:
 		return fmt.Errorf("unknown protocol picked: %s", protocol)
 	}

@@ -22,7 +22,7 @@ import (
 
 const (
 	headerLen      = 4
-	datagramMaxLen = 3600
+	datagramMaxLen = 6000
 )
 
 type Datagram struct {
@@ -63,27 +63,31 @@ func (d *Datagram) ReadFrom(r io.Reader) (int64, error) {
 	if err != nil {
 		return n, err
 	}
-	br := bytes.NewReader(b[:rn])
+	return n, d.Deserialize(b[:rn])
+}
+
+func (d *Datagram) Deserialize(b []byte) error {
+	br := bytes.NewReader(b)
 
 	h := &Header{}
-	err = binary.Read(br, binary.BigEndian, h)
+	err := binary.Read(br, binary.BigEndian, h)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	d.Header = h
 
 	dlen := br.Len()
 	if dlen != int(h.Length-headerLen) {
-		return n, fmt.Errorf("datagram length does not match actual received")
+		return fmt.Errorf("datagram length does not match actual received")
 	}
 	if dlen > 0 {
 		if h.Code != CodeRequest && h.Code != CodeResponse {
-			return n, fmt.Errorf("only request and response may have data")
+			return fmt.Errorf("only request and response may have data")
 		}
 
 		tbyte, err := br.ReadByte()
 		if err != nil {
-			return n, err
+			return err
 		}
 		d.Content = &Content{
 			Type: Type(tbyte),
@@ -93,16 +97,16 @@ func (d *Datagram) ReadFrom(r io.Reader) (int64, error) {
 			data := make([]byte, dlen-1)
 			rcount, err := br.Read(data)
 			if err != nil {
-				return n, err
+				return err
 			}
 			if rcount < dlen-1 {
-				return n, fmt.Errorf("EAP data shorter than noted length")
+				return fmt.Errorf("EAP data shorter than noted length")
 			}
 			d.Content.Data = data
 		}
 	}
 
-	return n, nil
+	return nil
 }
 
 func (d Datagram) WriteTo(w io.Writer) (int64, error) {

@@ -49,13 +49,15 @@ func (s *baseSession) newRequestDatagram(c Code, attrs ...*Attribute) (*Datagram
 }
 
 func (s *baseSession) newDatagram(h *Header, attrs ...*Attribute) (*Datagram, error) {
-	var err error
 	attrs = append(attrs, s.sendAttributes...)
 	if s.replyOnceAttributes != nil {
 		attrs = append(attrs, s.replyOnceAttributes...)
 		s.replyOnceAttributes = nil
 	}
-	d := newDatagram(h, attrs)
+	d, err := newDatagram(h, attrs)
+	if err != nil {
+		return nil, err
+	}
 	if ma := d.Attributes.FirstOfType(AttributeTypeMessageAuthenticator); ma != nil {
 		err = writeMessageAuthenticator(d, ma, s.sharedSecret)
 		if err != nil {

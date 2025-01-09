@@ -13,32 +13,31 @@ import (
 	"github.com/markeytos/radius-client/src/eap/diameter"
 )
 
+const ttlsMasterKeyLabel = "ttls keying material"
+
 type TTLS struct {
 	*TLS
+	client *tls.Conn
 }
 
 func CreateTTLS(session *Session, caCert, tlsVersion string) (*TTLS, error) {
-	tls, err := CreateTLS(session, caCert, tlsVersion)
-	tls.packetType = TypeTTLS
-	return &TTLS{tls}, err
+	t, err := internalCreateTLS(session, caCert, tlsVersion, TypeTTLS)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig := &tls.Config{
+		RootCAs:                t.rootCAs,
+		InsecureSkipVerify:     true,
+		MinVersion:             t.tlsVersion,
+		MaxVersion:             t.tlsVersion,
+		SessionTicketsDisabled: true,
+	}
+	return &TTLS{TLS: t, client: tls.Client(t, tlsConfig)}, nil
 }
 
 func (tt *TTLS) PAP(uname, pw string) error {
-	err := tt.start(TypeTTLS)
-	if err != nil {
-		return err
-	}
-
-	tlsConfig := &tls.Config{
-		RootCAs:            tt.rootCAs,
-		InsecureSkipVerify: true,
-		MinVersion:         tt.tlsVersion,
-		MaxVersion:         tt.tlsVersion,
-	}
-	tc := tls.Client(tt, tlsConfig)
-	bw := bufio.NewWriter(tc)
-
-	_, err = diameter.AttributeValuePair{
+	bw := bufio.NewWriter(tt.client)
+	_, err := diameter.AttributeValuePair{
 		Code:  diameter.CodeUserName,
 		Flags: diameter.FlagsMandatory,
 		Data:  []byte(uname),
@@ -46,7 +45,6 @@ func (tt *TTLS) PAP(uname, pw string) error {
 	if err != nil {
 		return err
 	}
-
 	_, err = diameter.AttributeValuePair{
 		Code:  diameter.CodeUserPassword,
 		Flags: diameter.FlagsMandatory,
@@ -55,12 +53,12 @@ func (tt *TTLS) PAP(uname, pw string) error {
 	if err != nil {
 		return err
 	}
-
 	err = bw.Flush()
 	if err != nil {
 		return err
 	}
 
+	// auth finalization
 	rd := &Datagram{}
 	_, err = tt.ReadDatagram(rd)
 	if err != nil {
@@ -69,14 +67,15 @@ func (tt *TTLS) PAP(uname, pw string) error {
 	if rd.Header.Code != CodeSuccess {
 		return fmt.Errorf("authentication failed")
 	}
+	tt.RecvKey, tt.SendKey, err = exportKeyingMaterial(tt.client, ttlsMasterKeyLabel)
+	return err
+}
 
-	// extract key material
-	connState := tc.ConnectionState()
-	km, err := connState.ExportKeyingMaterial("ttls keying material", nil, 128)
+func (tt *TTLS) Close() error {
+	var err error
+	tt.RecvKey, tt.SendKey, err = exportKeyingMaterial(tt.client, ttlsMasterKeyLabel)
 	if err != nil {
 		return err
 	}
-	tt.RecvKey = km[:32]
-	tt.SendKey = km[32:64]
-	return nil
+	return tt.TLS.Close()
 }

@@ -35,20 +35,20 @@ type Datagram struct {
 	Attributes Attributes
 }
 
-func newDatagram(h *Header, attrs []*Attribute) *Datagram {
+func newDatagram(h *Header, attrs []*Attribute) (*Datagram, error) {
 	attrs_len := 0
 	for _, a := range attrs {
 		attrs_len += len(a.Value) + 2
 	}
 	if attrs_len > DatagramMaxLen-headerLen {
-		panic("attribute overflows packet to over max size")
+		return nil, fmt.Errorf("attribute overflows packet to over max size")
 	}
 	h.Length = headerLen + uint16(attrs_len)
 
 	return &Datagram{
 		Header:     h,
 		Attributes: attrs,
-	}
+	}, nil
 }
 
 func (d *Datagram) ReadFrom(r io.Reader) (int64, error) {

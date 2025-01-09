@@ -33,9 +33,9 @@ func (s *Session) MsCHAPv2(uname, pw string) error {
 	mschapv2.WriteNTResponse(r.NTResponse[:], pwh, chall)
 	pwhh := mschapv2.NTPasswordHash(pwh)
 
-	sd := s.newDatagram(&Content{Type: TypeMsCHAPv2, Data: r.ToBinary()})
+	wd := s.newDatagram(&Content{Type: TypeMsCHAPv2, Data: r.ToBinary()})
 	rd := &Datagram{}
-	err = s.WriteReadDatagram(sd, rd)
+	err = s.WriteReadDatagram(wd, rd)
 	if err != nil {
 		return err
 	}
@@ -59,12 +59,20 @@ func (s *Session) MsCHAPv2(uname, pw string) error {
 		}
 	}
 
-	sd = s.newDatagram(&Content{Type: TypeMsCHAPv2, Data: []byte{byte(request.OpCode)}})
-	err = s.WriteReadDatagram(sd, rd)
+	wd = s.newDatagram(&Content{Type: TypeMsCHAPv2, Data: []byte{byte(request.OpCode)}})
+	_, err = s.WriteDatagram(wd)
 	if err != nil {
 		return err
 	}
 
+	if s.inEncryptedTunnel {
+		return s.Tunnel.Close()
+	}
+
+	_, err = s.ReadDatagram(rd)
+	if err != nil {
+		return err
+	}
 	if rd.Header.Code != CodeSuccess {
 		return fmt.Errorf("authentication failed")
 	}

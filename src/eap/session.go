@@ -16,10 +16,11 @@ type Session struct {
 	Tunnel            net.Conn
 	EAPSendStart      bool
 	AnonymousUsername string
+	RecvKey, SendKey  []byte
 	identifier        uint8
 	lastAction        sessionLastAction
 	lastReadDatagram  *Datagram
-	RecvKey, SendKey  []byte
+	inEncryptedTunnel bool
 }
 
 type sessionLastAction int
@@ -31,12 +32,20 @@ const (
 	sessionLastActionError
 )
 
-func NewSession(tunnel net.Conn, anonymousUname string, eapSendStart bool) Session {
-	return Session{
+func NewSession(tunnel net.Conn, anonymousUname string, eapSendStart bool) *Session {
+	encTunnel := false
+	if _, ok := tunnel.(*TtlsEAP); ok {
+		encTunnel = true
+	}
+	if _, ok := tunnel.(*PEAP); ok {
+		encTunnel = true
+	}
+	return &Session{
 		Tunnel:            tunnel,
 		EAPSendStart:      eapSendStart,
 		AnonymousUsername: anonymousUname,
 		identifier:        randUint8(),
+		inEncryptedTunnel: encTunnel,
 	}
 }
 
@@ -61,7 +70,7 @@ func (s *Session) WriteDatagram(wd *Datagram) (int, error) {
 		break
 	default:
 		s.lastAction = sessionLastActionError
-		return 0, fmt.Errorf("eap: out of order write: invalid last action")
+		return 0, fmt.Errorf("eap: out of order write: invalid last action: %s", lastActionString(s.lastAction))
 	}
 	n, err := wd.WriteTo(s.Tunnel)
 	if err != nil {
@@ -78,7 +87,7 @@ func (s *Session) ReadDatagram(rd *Datagram) (int, error) {
 		break
 	default:
 		s.lastAction = sessionLastActionError
-		return 0, fmt.Errorf("eap: out of order read: invalid last action")
+		return 0, fmt.Errorf("eap: out of order read: invalid last action: %s", lastActionString(s.lastAction))
 	}
 	n, err := rd.ReadFrom(s.Tunnel)
 	if err != nil {
@@ -156,4 +165,19 @@ func randUint8() uint8 {
 		panic(err)
 	}
 	return uint8(id.Int64())
+}
+
+func lastActionString(la sessionLastAction) string {
+	switch la {
+	case sessionLastActionNone:
+		return "none"
+	case sessionLastActionWriteDatagram:
+		return "write packet"
+	case sessionLastActionReadDatagram:
+		return "read packet"
+	case sessionLastActionError:
+		return "error"
+	default:
+		return "unknown"
+	}
 }

@@ -48,7 +48,7 @@ func (tt *EapAuthenticationTunnel) Read(b []byte) (n int, err error) {
 		return 0, fmt.Errorf("eap tunnel: out of order read: session ended")
 	default:
 		tt.lastAction = eapAuthenticationTunnelLastActionError
-		return 0, fmt.Errorf("eap tunnel: out of order read: invalid last action")
+		return 0, fmt.Errorf("eap tunnel: out of order read: invalid last action: %s", lastActionString(tt.lastAction))
 	}
 	n = 0
 	rd := &Datagram{}
@@ -81,7 +81,7 @@ func (tt *EapAuthenticationTunnel) Write(b []byte) (n int, err error) {
 		return 0, fmt.Errorf("eap tunnel: out of order write: session ended")
 	default:
 		tt.lastAction = eapAuthenticationTunnelLastActionError
-		return 0, fmt.Errorf("eap tunnel: out of order write: invalid last action")
+		return 0, fmt.Errorf("eap tunnel: out of order write: invalid last action: %s", lastActionString(tt.lastAction))
 	}
 	n = 0
 	var wd *Datagram
@@ -140,4 +140,21 @@ func (tt *EapAuthenticationTunnel) SetReadDeadline(t time.Time) error {
 
 func (tt *EapAuthenticationTunnel) SetWriteDeadline(t time.Time) error {
 	return tt.session.SetWriteDeadline(t)
+}
+
+func lastActionString(la eapAuthenticationTunnelLastAction) string {
+	switch la {
+	case eapAuthenticationTunnelLastActionNone:
+		return "none"
+	case eapAuthenticationTunnelLastActionWritePacket:
+		return "write packet"
+	case eapAuthenticationTunnelLastActionReadPacket:
+		return "read packet"
+	case eapAuthenticationTunnelLastActionError:
+		return "error"
+	case eapAuthenticationTunnelLastActionClose:
+		return "close"
+	default:
+		return "unknown"
+	}
 }
