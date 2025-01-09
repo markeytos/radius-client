@@ -13,12 +13,13 @@ import (
 )
 
 type Session struct {
-	Tunnel            net.Conn
+	Tunnel            EapTunnel
 	EAPSendStart      bool
 	AnonymousUsername string
 	RecvKey, SendKey  []byte
 	identifier        uint8
 	lastAction        sessionLastAction
+	lastErr           error
 	lastReadDatagram  *Datagram
 	inEncryptedTunnel bool
 }
@@ -32,7 +33,12 @@ const (
 	sessionLastActionError
 )
 
-func NewSession(tunnel net.Conn, anonymousUname string, eapSendStart bool) *Session {
+type EapTunnel interface {
+	net.Conn
+	MaxDataSize() int
+}
+
+func NewSession(tunnel EapTunnel, anonymousUname string, eapSendStart bool) *Session {
 	encTunnel := false
 	if _, ok := tunnel.(*TtlsEAP); ok {
 		encTunnel = true
@@ -68,14 +74,18 @@ func (s *Session) WriteDatagram(wd *Datagram) (int, error) {
 	switch s.lastAction {
 	case sessionLastActionNone, sessionLastActionReadDatagram:
 		break
+	case sessionLastActionError:
+		return 0, fmt.Errorf("eap: out of order write: invalid last action: error: %w", s.lastErr)
 	default:
+		s.lastErr = fmt.Errorf("eap: out of order write: invalid last action: %s", lastActionString(s.lastAction))
 		s.lastAction = sessionLastActionError
-		return 0, fmt.Errorf("eap: out of order write: invalid last action: %s", lastActionString(s.lastAction))
+		return 0, s.lastErr
 	}
 	n, err := wd.WriteTo(s.Tunnel)
 	if err != nil {
+		s.lastErr = fmt.Errorf("eap: error sending datagram: %w", err)
 		s.lastAction = sessionLastActionError
-		return int(n), fmt.Errorf("eap: error sending datagram: %w", err)
+		return int(n), s.lastErr
 	}
 	s.lastAction = sessionLastActionWriteDatagram
 	return int(n), nil
@@ -85,14 +95,18 @@ func (s *Session) ReadDatagram(rd *Datagram) (int, error) {
 	switch s.lastAction {
 	case sessionLastActionNone, sessionLastActionWriteDatagram:
 		break
+	case sessionLastActionError:
+		return 0, fmt.Errorf("eap: out of order write: invalid last action: error: %w", s.lastErr)
 	default:
+		s.lastErr = fmt.Errorf("eap: out of order read: invalid last action: %s", lastActionString(s.lastAction))
 		s.lastAction = sessionLastActionError
-		return 0, fmt.Errorf("eap: out of order read: invalid last action: %s", lastActionString(s.lastAction))
+		return 0, s.lastErr
 	}
 	n, err := rd.ReadFrom(s.Tunnel)
 	if err != nil {
+		s.lastErr = fmt.Errorf("eap: error receiving datagram: %w", err)
 		s.lastAction = sessionLastActionError
-		return int(n), fmt.Errorf("eap: error receiving datagram: %w", err)
+		return int(n), s.lastErr
 	}
 	s.lastReadDatagram = rd
 	s.lastAction = sessionLastActionReadDatagram

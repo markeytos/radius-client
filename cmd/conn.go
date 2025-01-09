@@ -16,10 +16,6 @@ import (
 	"github.com/markeytos/radius-client/src/radius"
 )
 
-const (
-	defaultMTUSize = 1500
-)
-
 type statusSession interface {
 	net.Conn
 	Status() error
@@ -59,7 +55,11 @@ func dialTLS(address, caCert, clientCert string) (*tls.Conn, error) {
 	return conn, conn.Handshake()
 }
 
-func newUDPAuthSession(address, sharedSecret string) (*radius.AuthenticationSession, error) {
+func newUDPAuthSession(address, sharedSecret, mtuSize string) (*radius.AuthenticationSession, error) {
+	mtu, err := strconv.Atoi(mtuSize)
+	if err != nil {
+		return nil, fmt.Errorf("invalid integer for MTU: %s", mtuSize)
+	}
 	to, err := time.ParseDuration(udpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)
@@ -70,9 +70,9 @@ func newUDPAuthSession(address, sharedSecret string) (*radius.AuthenticationSess
 	}
 	sendAttrs := map[radius.AttributeType]string{
 		radius.AttributeTypeNasIdentifier: "radius-client",
-		radius.AttributeTypeFramedMtu:     strconv.Itoa(defaultMTUSize),
+		radius.AttributeTypeFramedMtu:     mtuSize,
 	}
-	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, defaultMTUSize, sendAttrs)
+	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, mtu, sendAttrs)
 }
 
 func newUDPAcctSession(address, sharedSecret string) (*radius.AccountingSession, error) {

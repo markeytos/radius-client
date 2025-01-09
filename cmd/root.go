@@ -14,6 +14,7 @@ var (
 	udpAuthPort  int
 	udpAcctPort  int
 	udpRetries   int
+	udpMTUSize   string
 	udpTimeout   string
 	tcpPort      int
 	tlsTimeout   string
@@ -40,6 +41,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&udpAuthPort, "udp-auth-port", radius.UDPAuthenticationPort, "RADIUS/UDP authentication port")
 	rootCmd.PersistentFlags().IntVar(&udpAcctPort, "udp-acct-port", radius.UDPAccountingPort, "RADIUS/UDP accounting port")
 	rootCmd.PersistentFlags().IntVar(&udpRetries, "udp-retries", 2, "RADIUS/UDP packet send retries")
+	rootCmd.PersistentFlags().StringVar(&udpMTUSize, "udp-mtu", "1300", "RADIUS/UDP connection MTU size")
 	rootCmd.PersistentFlags().StringVar(&udpTimeout, "udp-timeout", "5s", "RADIUS/UDP connection response timeout")
 	rootCmd.PersistentFlags().IntVar(&tcpPort, "tcp-port", radius.RadSecTCPPort, "RADIUS/TLS (RadSec) port")
 	rootCmd.PersistentFlags().BoolVar(&radsecUnsafe, "radsec-unsafe", false, "RADIUS/TLS (RadSec) skip server authentication")

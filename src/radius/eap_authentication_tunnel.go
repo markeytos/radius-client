@@ -15,6 +15,7 @@ import (
 type EapAuthenticationTunnel struct {
 	session           *AuthenticationSession
 	anonymousUsername string
+	baseAvailableLen  int
 	lastAction        eapAuthenticationTunnelLastAction
 }
 
@@ -34,10 +35,23 @@ func NewEapAuthenticationTunnel(session *AuthenticationSession, anonymousUsernam
 		newAttribute(AttributeTypeUserName, []byte(anonymousUsername)),
 		newEmptyMessageAuthenticator(),
 	)
+	attrsLen := 0
+	for _, a := range session.sendAttributes {
+		attrsLen += len(a.Value) + 2
+	}
 	return &EapAuthenticationTunnel{
 		session:           session,
 		anonymousUsername: anonymousUsername,
+		baseAvailableLen:  session.mtuSize - headerLen - attrsLen,
 	}
+}
+
+func (tt *EapAuthenticationTunnel) MaxDataSize() int {
+	s := tt.baseAvailableLen
+	for _, a := range tt.session.replyOnceAttributes {
+		s -= len(a.Value) + 2
+	}
+	return s - ((s+maxAttributeLen-1)/maxAttributeLen)*2
 }
 
 func (tt *EapAuthenticationTunnel) Read(b []byte) (n int, err error) {

@@ -179,13 +179,47 @@ func (tt *TLS) Read(b []byte) (int, error) {
 	return n, nil
 }
 
-func (tt *TLS) Write(b []byte) (n int, err error) {
-	data := &eaptls.Data{
-		Flags: eaptls.FlagsStart,
-		Data:  b,
+func (tt *TLS) Write(b []byte) (int, error) {
+	nt := 0
+	s := tt.Tunnel.MaxDataSize() - 6
+	f := eaptls.FlagsLength
+	l := len(b)
+	for len(b) > 0 {
+		rem := len(b) > s
+		d := b[:min(len(b), s)]
+		if rem {
+			f |= eaptls.FlagsMore
+		}
+		data := &eaptls.Data{
+			Flags:            f,
+			Data:             d,
+			TLSMessageLength: uint32(l),
+		}
+		wd := tt.newDatagram(&Content{Type: tt.packetType, Data: data.ToBinary()})
+		n, err := tt.WriteDatagram(wd)
+		if err != nil {
+			return nt, err
+		}
+		nt += n
+		b = b[len(d):]
+		f = 0
+
+		if rem {
+			rd := &Datagram{}
+			_, err = tt.ReadDatagram(rd)
+			if err != nil {
+				return nt, err
+			}
+			if rd.Header.Code != CodeRequest ||
+				rd.Content == nil ||
+				rd.Content.Type != tt.packetType ||
+				len(rd.Content.Data) != 1 ||
+				rd.Content.Data[0] != 0 {
+				return nt, fmt.Errorf("eap tls: expected empty request to send fragments")
+			}
+		}
 	}
-	wd := tt.newDatagram(&Content{Type: tt.packetType, Data: data.ToBinary()})
-	return tt.WriteDatagram(wd)
+	return nt, nil
 }
 
 func (tt *TLS) Close() error {

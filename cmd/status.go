@@ -22,7 +22,7 @@ var statusUdpAuthCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return status(func() (statusSession, error) {
-			return newUDPAuthSession(args[0], args[1])
+			return newUDPAuthSession(args[0], args[1], udpMTUSize)
 		})
 	},
 	SilenceUsage: true,

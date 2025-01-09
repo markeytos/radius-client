@@ -20,6 +20,10 @@ func CreateTtlsEAP(session *Session, caCert, tlsVersion string) (*TtlsEAP, error
 	return &TtlsEAP{ttls}, err
 }
 
+func (tt *TtlsEAP) MaxDataSize() int {
+	return 10000
+}
+
 func (tt *TtlsEAP) Read(b []byte) (int, error) {
 	d := &diameter.AttributeValuePair{}
 	n, err := d.ReadFrom(tt.client)

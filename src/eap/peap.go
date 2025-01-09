@@ -32,6 +32,10 @@ func CreatePEAP(session *Session, caCert, tlsVersion string) (*PEAP, error) {
 	return &PEAP{TLS: t, client: tls.Client(t, tlsConfig)}, nil
 }
 
+func (tt *PEAP) MaxDataSize() int {
+	return 10000
+}
+
 func (tt *PEAP) Read(b []byte) (int, error) {
 	n, err := tt.client.Read(b[4:])
 	if err != nil {
