@@ -22,14 +22,15 @@ var statusUdpAuthCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		session, err := newUDPAuthSession(args[0], args[1])
 		if err != nil {
-			return fmt.Errorf("failed to create session: %w", err)
+			return fmt.Errorf("status: failed to create udp auth session: %w", err)
 		}
 		defer session.Close()
 		err = session.Status()
-		if err == nil {
-			println("Successful status UDP authentication")
+		if err != nil {
+			return fmt.Errorf("status: %w", err)
 		}
-		return err
+		println("Successful status UDP authentication")
+		return nil
 	},
 	SilenceUsage: true,
 }
@@ -41,14 +42,15 @@ var statusUdpAcctCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		session, err := newUDPAcctSession(args[0], args[1])
 		if err != nil {
-			return fmt.Errorf("failed to create session: %w", err)
+			return fmt.Errorf("status: failed to create udp acct session: %w", err)
 		}
 		defer session.Close()
 		err = session.Status()
-		if err == nil {
-			println("Successful status over UDP accounting")
+		if err != nil {
+			return fmt.Errorf("status: %w", err)
 		}
-		return err
+		println("Successful status over UDP accounting")
+		return nil
 	},
 	SilenceUsage: true,
 }
@@ -60,14 +62,15 @@ var statusTlsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		session, err := newTLSAuthSession(args[0], args[1], args[2])
 		if err != nil {
-			return fmt.Errorf("failed to create session: %w", err)
+			return fmt.Errorf("status: failed to create tls session: %w", err)
 		}
 		defer session.Close()
 		err = session.Status()
-		if err == nil {
-			println("Successful TLS status")
+		if err != nil {
+			return fmt.Errorf("status: %w", err)
 		}
-		return err
+		println("Successful TLS status")
+		return nil
 	},
 	SilenceUsage: true,
 }

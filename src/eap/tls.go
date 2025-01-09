@@ -18,14 +18,14 @@ import (
 
 type TLS struct {
 	*Session
-	clientCertificate tls.Certificate
-	rootCAs           *x509.CertPool
-	readBuffer        []byte
-	readMore          bool
-	tlsVersion        uint16
+	rootCAs    *x509.CertPool
+	tlsVersion uint16
+	packetType Type
+	readBuffer []byte
+	readMore   bool
 }
 
-func CreateTLS(session *Session, clientCert, caCert, tlsVersion string) (*TLS, error) {
+func CreateTLS(session *Session, caCert, tlsVersion string) (*TLS, error) {
 	content, err := os.ReadFile(caCert)
 	if err != nil {
 		return nil, err
@@ -33,10 +33,6 @@ func CreateTLS(session *Session, clientCert, caCert, tlsVersion string) (*TLS, e
 	rootCAs := x509.NewCertPool()
 	rootCAs.AppendCertsFromPEM(content)
 
-	cert, err := tls.LoadX509KeyPair(clientCert, clientCert)
-	if err != nil {
-		return nil, err
-	}
 	var tlsv uint16
 	switch tlsVersion {
 	case "1.2":
@@ -48,14 +44,14 @@ func CreateTLS(session *Session, clientCert, caCert, tlsVersion string) (*TLS, e
 	}
 
 	return &TLS{
-		Session:           session,
-		clientCertificate: cert,
-		rootCAs:           rootCAs,
-		tlsVersion:        tlsv,
+		Session:    session,
+		rootCAs:    rootCAs,
+		tlsVersion: tlsv,
+		packetType: TypeTLS,
 	}, nil
 }
 
-func (tt *TLS) Authenticate() error {
+func (tt *TLS) Authenticate(cert tls.Certificate) error {
 	err := tt.start(TypeTLS)
 	if err != nil {
 		return err
@@ -63,7 +59,7 @@ func (tt *TLS) Authenticate() error {
 
 	tlsConfig := &tls.Config{
 		RootCAs:            tt.rootCAs,
-		Certificates:       []tls.Certificate{tt.clientCertificate},
+		Certificates:       []tls.Certificate{cert},
 		InsecureSkipVerify: true,
 		MinVersion:         tt.tlsVersion,
 		MaxVersion:         tt.tlsVersion,
@@ -71,11 +67,14 @@ func (tt *TLS) Authenticate() error {
 	tc := tls.Client(tt, tlsConfig)
 	authErr := tc.Handshake()
 
-	wd := tt.newDatagram(&Content{Type: TypeTLS, Data: []byte{0}})
+	wd := tt.newDatagram(&Content{Type: tt.packetType, Data: []byte{0}})
 	rd := &Datagram{}
 	err = tt.WriteReadDatagram(wd, rd)
 	if err != nil {
 		return err
+	}
+	if rd.Header.Code != CodeSuccess {
+		return fmt.Errorf("authentication failed")
 	}
 
 	// extract key material
@@ -117,21 +116,24 @@ func (tt *TLS) Read(b []byte) (n int, err error) {
 				}
 				return n, nil
 			}
-			wd := tt.newDatagram(&Content{Type: TypeTLS, Data: []byte{0}})
+			wd := tt.newDatagram(&Content{Type: tt.packetType, Data: []byte{0}})
 			err = tt.WriteReadDatagram(wd, rd)
 			if err != nil {
 				return
 			}
 		}
 
-		if rd.Header.Code == CodeResponse {
-			return n, fmt.Errorf("server sent a response EAP packet")
+		switch rd.Header.Code {
+		case CodeResponse:
+			return n, fmt.Errorf("server sent a response packet")
+		case CodeFailure:
+			return n, fmt.Errorf("server sent a failure packet")
 		}
 		if rd.Content == nil {
 			return n, fmt.Errorf("server did not send EAP with content")
 		}
-		if rd.Content.Type != TypeTLS {
-			return n, fmt.Errorf("server sent a non EAP-TLS packet")
+		if rd.Content.Type != tt.packetType {
+			return n, fmt.Errorf("server sent a packet of unexpected EAP type")
 		}
 		data := eaptls.CreateDataFromBuffer(rd.Content.Data)
 		tt.readMore = data.Flags&eaptls.FlagsMore != 0
@@ -151,7 +153,7 @@ func (tt *TLS) Write(b []byte) (n int, err error) {
 		Flags: eaptls.FlagsStart,
 		Data:  b,
 	}
-	wd := tt.newDatagram(&Content{Type: TypeTLS, Data: data.ToBinary()})
+	wd := tt.newDatagram(&Content{Type: tt.packetType, Data: data.ToBinary()})
 	return tt.WriteDatagram(wd)
 }
 

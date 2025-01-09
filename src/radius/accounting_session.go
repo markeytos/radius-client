@@ -6,7 +6,6 @@ Define RADIUS accounting session
 package radius
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -47,7 +46,7 @@ func (s *AccountingSession) Status() error {
 		return fmt.Errorf("invalid status response code: %s", rd.Header.Code.String())
 	}
 	if !rd.Attributes.ContainsOfType(AttributeTypeMessageAuthenticator) {
-		return errors.New("missing message authenticator in response")
+		return fmt.Errorf("missing message authenticator in response")
 	}
 	return nil
 }

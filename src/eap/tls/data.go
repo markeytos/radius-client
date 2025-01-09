@@ -25,6 +25,15 @@ type Data struct {
 	Data             []byte
 }
 
+type Flags uint8
+
+const (
+	FlagsLength Flags = 0x80 >> iota
+	FlagsMore
+	FlagsStart
+	FlagsTLSMessageLength
+)
+
 func CreateDataFromBuffer(b []byte) *Data {
 	f := Flags(b[0])
 	if f&FlagsLength != 0 {
@@ -59,12 +68,3 @@ func (d *Data) ToBinary() []byte {
 	b = append(b, d.Data...)
 	return b
 }
-
-type Flags uint8
-
-const (
-	FlagsLength Flags = 0x80 >> iota
-	FlagsMore
-	FlagsStart
-	FlagsTLSMessageLength
-)

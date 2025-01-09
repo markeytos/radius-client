@@ -7,7 +7,6 @@ package eap
 
 import (
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -56,50 +55,18 @@ func (s *Session) newDatagram(cont *Content) *Datagram {
 	return newDatagram(h, cont)
 }
 
-func (s *Session) TtlsPAP(uname, pw string) error {
-	err := s.start(TypeTTLS)
-	if err != nil {
-		return err
-	}
-	return errors.New("EAP-TTLS/PAP not implemented")
-}
-
-func (s *Session) TtlsEapMsCHAPv2(uname, pw string) error {
-	err := s.start(TypeTTLS)
-	if err != nil {
-		return err
-	}
-	return errors.New("EAP-TTLS/EAP-MS-CHAPv2 not implemented")
-}
-
-func (s *Session) TtlsEapTLS() error {
-	err := s.start(TypeTTLS)
-	if err != nil {
-		return err
-	}
-	return errors.New("EAP-TTLS/EAP-TLS not implemented")
-}
-
-func (s *Session) PeapMsCHAPv2(uname, pw string) error {
-	err := s.start(TypePEAP)
-	if err != nil {
-		return err
-	}
-	return errors.New("PEAP/MS-CHAPv2 not implemented")
-}
-
 func (s *Session) WriteDatagram(wd *Datagram) (int, error) {
 	switch s.lastAction {
 	case sessionLastActionNone, sessionLastActionReadDatagram:
 		break
 	default:
 		s.lastAction = sessionLastActionError
-		return 0, fmt.Errorf("out of order write: invalid last action")
+		return 0, fmt.Errorf("eap: out of order write: invalid last action")
 	}
 	n, err := wd.WriteTo(s.Tunnel)
 	if err != nil {
 		s.lastAction = sessionLastActionError
-		return int(n), fmt.Errorf("error sending EAP datagram: %w", err)
+		return int(n), fmt.Errorf("eap: error sending datagram: %w", err)
 	}
 	s.lastAction = sessionLastActionWriteDatagram
 	return int(n), nil
@@ -111,12 +78,12 @@ func (s *Session) ReadDatagram(rd *Datagram) (int, error) {
 		break
 	default:
 		s.lastAction = sessionLastActionError
-		return 0, fmt.Errorf("out of order read: invalid last action")
+		return 0, fmt.Errorf("eap: out of order read: invalid last action")
 	}
 	n, err := rd.ReadFrom(s.Tunnel)
 	if err != nil {
 		s.lastAction = sessionLastActionError
-		return int(n), fmt.Errorf("error receiving EAP datagram: %w", err)
+		return int(n), fmt.Errorf("eap: error receiving datagram: %w", err)
 	}
 	s.lastReadDatagram = rd
 	s.lastAction = sessionLastActionReadDatagram

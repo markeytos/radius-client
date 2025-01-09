@@ -4,7 +4,6 @@ Copyright © 2024 Keytos alan@keytos.io
 package cmd
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -24,10 +23,10 @@ var acctUdpCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		session, err := newUDPAcctSession(args[0], args[1])
 		if err != nil {
-			return fmt.Errorf("failed to create session: %w", err)
+			return fmt.Errorf("acct: failed to create udp session: %w", err)
 		}
 		defer session.Close()
-		return errors.New("UDP accounting not implemented")
+		return fmt.Errorf("acct: not implemented")
 	},
 	SilenceUsage: true,
 }
@@ -39,10 +38,10 @@ var acctTlsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		session, err := newTLSAcctSession(args[0], args[1], args[2])
 		if err != nil {
-			return fmt.Errorf("failed to create session: %w", err)
+			return fmt.Errorf("acct: failed to create tls session: %w", err)
 		}
 		defer session.Close()
-		return errors.New("TLS accounting not implemented")
+		return fmt.Errorf("acct: not implemented")
 	},
 	SilenceUsage: true,
 }

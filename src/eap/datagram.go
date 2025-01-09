@@ -16,7 +16,6 @@ package eap
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 )
@@ -75,7 +74,7 @@ func (d *Datagram) ReadFrom(r io.Reader) (int64, error) {
 
 	dlen := br.Len()
 	if dlen != int(h.Length-headerLen) {
-		return n, errors.New("datagram length does not match actual received")
+		return n, fmt.Errorf("datagram length does not match actual received")
 	}
 	if dlen > 0 {
 		if h.Code != CodeRequest && h.Code != CodeResponse {
@@ -97,7 +96,7 @@ func (d *Datagram) ReadFrom(r io.Reader) (int64, error) {
 				return n, err
 			}
 			if rcount < dlen-1 {
-				return n, errors.New("EAP data shorter than noted length")
+				return n, fmt.Errorf("EAP data shorter than noted length")
 			}
 			d.Content.Data = data
 		}

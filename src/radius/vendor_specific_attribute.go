@@ -19,18 +19,6 @@ type VendorSpecificAttribute struct {
 	Value []byte
 }
 
-func (as Attributes) FirstVendorSpecificAttributeOfType(id VendorId, t VendorType) *VendorSpecificAttribute {
-	for _, a := range as {
-		if a.Type == AttributeTypeVendorSpecific && len(a.Value) > 6 {
-			if id == VendorId(binary.BigEndian.Uint32(a.Value[:4])) &&
-				t == VendorType(a.Value[4]) {
-				return &VendorSpecificAttribute{Id: id, Type: t, Value: a.Value[6 : 4+a.Value[5]]}
-			}
-		}
-	}
-	return nil
-}
-
 type VendorId uint32
 
 const (
@@ -45,3 +33,15 @@ const (
 	VendorTypeMicrosoftMPPESendKey VendorType = 16
 	VendorTypeMicrosoftMPPERecvKey VendorType = 17
 )
+
+func (as Attributes) FirstVendorSpecificAttributeOfType(id VendorId, t VendorType) *VendorSpecificAttribute {
+	for _, a := range as {
+		if a.Type == AttributeTypeVendorSpecific && len(a.Value) > 6 {
+			if id == VendorId(binary.BigEndian.Uint32(a.Value[:4])) &&
+				t == VendorType(a.Value[4]) {
+				return &VendorSpecificAttribute{Id: id, Type: t, Value: a.Value[6 : 4+a.Value[5]]}
+			}
+		}
+	}
+	return nil
+}

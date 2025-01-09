@@ -8,9 +8,9 @@ package radius
 import (
 	"crypto/md5"
 	"crypto/subtle"
-	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -48,14 +48,14 @@ func (s *AuthenticationSession) Status() error {
 	rd := &Datagram{}
 	err = s.WriteReadDatagram(sd, rd)
 	if err != nil {
-		return fmt.Errorf("failed to carry out status round: %w", err)
+		return fmt.Errorf("status: %w", err)
 	}
 
 	if rd.Header.Code != CodeAccessAccept {
-		return fmt.Errorf("invalid status response code: %s", rd.Header.Code.String())
+		return fmt.Errorf("status: invalid status response code: %s", rd.Header.Code.String())
 	}
 	if !rd.Attributes.ContainsOfType(AttributeTypeMessageAuthenticator) {
-		return errors.New("missing message authenticator in response")
+		return fmt.Errorf("status: missing message authenticator in response")
 	}
 	return nil
 }
@@ -72,15 +72,15 @@ func (s *AuthenticationSession) MAB(macAddress string) error {
 	rd := &Datagram{}
 	err = s.WriteReadDatagram(sd, rd)
 	if err != nil {
-		return fmt.Errorf("failed to do MAB round: %w", err)
+		return fmt.Errorf("mab: %w", err)
 	}
 
 	if rd.Header.Code != CodeAccessAccept {
 		a := rd.Attributes.FirstOfType(AttributeTypeReplyMessage)
 		if a == nil {
-			return fmt.Errorf("MAB authentication failed")
+			return fmt.Errorf("mab: authentication failed")
 		}
-		return fmt.Errorf("MAB authentication failed: %s", string(a.Value))
+		return fmt.Errorf("mab: authentication failed: %s", string(a.Value))
 	}
 	return nil
 }
@@ -100,38 +100,42 @@ func (s *AuthenticationSession) PAP(username, password string) error {
 	rd := &Datagram{}
 	err = s.WriteReadDatagram(sd, rd)
 	if err != nil {
-		return fmt.Errorf("failed to do MAB round: %w", err)
+		return fmt.Errorf("pap: %w", err)
 	}
 
 	if rd.Header.Code != CodeAccessAccept {
 		a := rd.Attributes.FirstOfType(AttributeTypeReplyMessage)
 		if a == nil {
-			return fmt.Errorf("PAP authentication failed")
+			return fmt.Errorf("pap: authentication failed")
 		}
-		return fmt.Errorf("PAP authentication failed: %s", string(a.Value))
+		return fmt.Errorf("pap: authentication failed: %s", string(a.Value))
 	}
 	return nil
 }
 
 func (s *AuthenticationSession) VerifyEAP(recvkey, sendkey []byte) error {
 	if s.lastReadDatagram.Header.Code != CodeAccessAccept {
-		return fmt.Errorf("last read datagram was not an Access-Accept")
+		return fmt.Errorf("eap: last read datagram was not an Access-Accept")
 	}
 
+	mismatchedKeys := make([]string, 0, 2)
 	recvkeyAttr := s.lastReadDatagram.Attributes.FirstVendorSpecificAttributeOfType(VendorIdMicrosoft, VendorTypeMicrosoftMPPERecvKey)
 	if recvkeyAttr != nil {
 		if !s.sessionKeyEqual(recvkey, s.lastWrittenDatagram.Header.Authenticator[:], recvkeyAttr.Value[:2], recvkeyAttr.Value[2:]) {
-			return fmt.Errorf("session key (MS-MPPE-Recv-Key) mismatch")
+			mismatchedKeys = append(mismatchedKeys, "MS-MPPE-Recv-Key")
 		}
 	}
 
 	sendkeyAttr := s.lastReadDatagram.Attributes.FirstVendorSpecificAttributeOfType(VendorIdMicrosoft, VendorTypeMicrosoftMPPESendKey)
 	if sendkeyAttr != nil {
 		if !s.sessionKeyEqual(sendkey, s.lastWrittenDatagram.Header.Authenticator[:], sendkeyAttr.Value[:2], sendkeyAttr.Value[2:]) {
-			return fmt.Errorf("session key (MS-MPPE-Send-Key) mismatch")
+			mismatchedKeys = append(mismatchedKeys, "MS-MPPE-Send-Key")
 		}
 	}
 
+	if len(mismatchedKeys) > 0 {
+		return fmt.Errorf("eap: session key (%s) mismatch", strings.Join(mismatchedKeys, ", "))
+	}
 	return nil
 }
 

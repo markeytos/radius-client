@@ -21,7 +21,7 @@ package radius
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
+	"fmt"
 	"io"
 )
 
@@ -69,7 +69,7 @@ func (d *Datagram) ReadFrom(r io.Reader) (int64, error) {
 
 	var attrs []*Attribute
 	if br.Len() != int(h.Length-headerLen) {
-		return n, errors.New("packet length does not match actual packet")
+		return n, fmt.Errorf("packet length does not match actual packet")
 	}
 	for br.Len() > 0 {
 		tbyte, err := br.ReadByte()
@@ -88,7 +88,7 @@ func (d *Datagram) ReadFrom(r io.Reader) (int64, error) {
 			return n, err
 		}
 		if rcount < int(lbyte-2) {
-			return n, errors.New("attribute shorter than noted length")
+			return n, fmt.Errorf("attribute shorter than noted length")
 		}
 
 		attrs = append(attrs, &Attribute{Type: AttributeType(tbyte), Value: value})

@@ -12,12 +12,7 @@ import (
 	"github.com/markeytos/radius-client/src/eap/mschapv2"
 )
 
-type MsCHAPv2 struct {
-	*Session
-	Username, Password string
-}
-
-func (s *MsCHAPv2) Authenticate() error {
+func (s *Session) MsCHAPv2(uname, pw string) error {
 	err := s.start(TypeMsCHAPv2)
 	if err != nil {
 		return err
@@ -31,9 +26,9 @@ func (s *MsCHAPv2) Authenticate() error {
 		return err
 	}
 
-	r := mschapv2.CreateEmptyResponse(c, s.Username)
-	chall := mschapv2.ChallengeHash(r.PeerChallenge[:], c.Challenge[:], s.Username)
-	pwb := mschapv2.Utf16Bytes(s.Password)
+	r := mschapv2.CreateEmptyResponse(c, uname)
+	chall := mschapv2.ChallengeHash(r.PeerChallenge[:], c.Challenge[:], uname)
+	pwb := mschapv2.Utf16Bytes(pw)
 	pwh := mschapv2.NTPasswordHash(pwb)
 	mschapv2.WriteNTResponse(r.NTResponse[:], pwh, chall)
 	pwhh := mschapv2.NTPasswordHash(pwh)
