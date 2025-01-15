@@ -15,7 +15,7 @@ import (
 )
 
 type AuthenticationSession struct {
-	baseSession
+	session
 }
 
 func NewAuthenticationSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSize int, sendattrsMap map[AttributeType]string) (*AuthenticationSession, error) {
@@ -24,7 +24,7 @@ func NewAuthenticationSession(conn net.Conn, ss string, timeout time.Duration, r
 		return nil, err
 	}
 	return &AuthenticationSession{
-		baseSession: baseSession{
+		session: session{
 			Conn:           conn,
 			identifier:     randUint8(),
 			sharedSecret:   ss,
