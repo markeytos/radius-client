@@ -12,12 +12,12 @@ import (
 )
 
 type AccountingSession struct {
-	baseSession
+	session
 }
 
 func NewAccountingSession(conn net.Conn, ss string, timeout time.Duration, retries int) *AccountingSession {
 	return &AccountingSession{
-		baseSession: baseSession{
+		session: session{
 			Conn:         conn,
 			identifier:   randUint8(),
 			sharedSecret: ss,

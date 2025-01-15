@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-type baseSession struct {
+type session struct {
 	net.Conn
 	identifier          uint8
 	sharedSecret        string
@@ -29,7 +29,8 @@ type baseSession struct {
 	lastWrittenDatagram *Datagram
 }
 
-func (s *baseSession) newRequestHeader(c Code) *Header {
+func (s *session) newRequestHeader(c Code) *Header {
+	s.identifier++
 	h := &Header{
 		Code:       c,
 		Identifier: s.identifier,
@@ -39,16 +40,15 @@ func (s *baseSession) newRequestHeader(c Code) *Header {
 	if err != nil {
 		panic(err)
 	}
-	s.identifier++
 	return h
 }
 
-func (s *baseSession) newRequestDatagram(c Code, attrs ...*Attribute) (*Datagram, error) {
+func (s *session) newRequestDatagram(c Code, attrs ...*Attribute) (*Datagram, error) {
 	h := s.newRequestHeader(c)
 	return s.newDatagram(h, attrs...)
 }
 
-func (s *baseSession) newDatagram(h *Header, attrs ...*Attribute) (*Datagram, error) {
+func (s *session) newDatagram(h *Header, attrs ...*Attribute) (*Datagram, error) {
 	attrs = append(attrs, s.sendAttributes...)
 	if s.replyOnceAttributes != nil {
 		attrs = append(attrs, s.replyOnceAttributes...)
@@ -67,7 +67,7 @@ func (s *baseSession) newDatagram(h *Header, attrs ...*Attribute) (*Datagram, er
 	return d, nil
 }
 
-func (s *baseSession) WriteDatagram(wd *Datagram) (int, error) {
+func (s *session) WriteDatagram(wd *Datagram) (int, error) {
 	err := s.SetWriteDeadline(time.Now().Add(s.timeout))
 	if err != nil {
 		return 0, fmt.Errorf("error setting send deadline: %w", err)
@@ -80,7 +80,7 @@ func (s *baseSession) WriteDatagram(wd *Datagram) (int, error) {
 	return int(n), nil
 }
 
-func (s *baseSession) ReadDatagram(rd *Datagram) (int, error) {
+func (s *session) ReadDatagram(rd *Datagram) (int, error) {
 	var n int64
 	var err error
 	for range s.retries {
@@ -89,13 +89,16 @@ func (s *baseSession) ReadDatagram(rd *Datagram) (int, error) {
 			return 0, fmt.Errorf("error setting receive deadline: %w", err)
 		}
 		n, err = rd.ReadFrom(s)
-		if err == nil {
+		if err == nil && rd.Header.Identifier == s.identifier {
 			break
 		}
 		_, werr := s.WriteDatagram(s.lastWrittenDatagram)
 		if werr != nil {
 			return 0, fmt.Errorf("error sending RADIUS datagram in receive retry: %w", werr)
 		}
+	}
+	if rd.Header.Identifier != s.identifier {
+		return int(n), fmt.Errorf("did not get response from server")
 	}
 	if err != nil {
 		return int(n), fmt.Errorf("error receiving RADIUS datagram: %w", err)
@@ -113,7 +116,7 @@ func (s *baseSession) ReadDatagram(rd *Datagram) (int, error) {
 	return int(n), nil
 }
 
-func (s *baseSession) WriteReadDatagram(wd *Datagram, rd *Datagram) error {
+func (s *session) WriteReadDatagram(wd *Datagram, rd *Datagram) error {
 	_, err := s.WriteDatagram(wd)
 	if err != nil {
 		return err
