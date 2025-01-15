@@ -97,7 +97,7 @@ func (s *session) ReadDatagram(rd *Datagram) (int, error) {
 			return 0, fmt.Errorf("error sending RADIUS datagram in receive retry: %w", werr)
 		}
 	}
-	if rd.Header.Identifier != s.identifier {
+	if rd.Header == nil || rd.Header.Identifier != s.identifier {
 		return int(n), fmt.Errorf("did not get response from server")
 	}
 	if err != nil {
