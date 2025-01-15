@@ -28,23 +28,23 @@ const (
 // required values for protocols
 // no sets in go, so using maps with empty structs
 var (
-	requireMACAddress          = map[string]struct{}{authMAB: struct{}{}}
+	requireMACAddress          = map[string]struct{}{authMAB: {}}
 	requireUsernameAndPassword = map[string]struct{}{
-		authPAP:                struct{}{},
-		authEapMsCHAPv2:        struct{}{},
-		authEapTtlsPAP:         struct{}{},
-		authEapTtlsEapMsCHAPv2: struct{}{},
-		authPeapMsCHAPv2:       struct{}{},
+		authPAP:                {},
+		authEapMsCHAPv2:        {},
+		authEapTtlsPAP:         {},
+		authEapTtlsEapMsCHAPv2: {},
+		authPeapMsCHAPv2:       {},
 	}
 	requireClientAndCACertificate = map[string]struct{}{
-		authEapTLS:        struct{}{},
-		authEapTtlsEapTLS: struct{}{},
+		authEapTLS:        {},
+		authEapTtlsEapTLS: {},
 	}
 	requireTunneledCACertificate = map[string]struct{}{
-		authEapTtlsPAP:         struct{}{},
-		authEapTtlsEapMsCHAPv2: struct{}{},
-		authEapTtlsEapTLS:      struct{}{},
-		authPeapMsCHAPv2:       struct{}{},
+		authEapTtlsPAP:         {},
+		authEapTtlsEapMsCHAPv2: {},
+		authEapTtlsEapTLS:      {},
+		authPeapMsCHAPv2:       {},
 	}
 )
 

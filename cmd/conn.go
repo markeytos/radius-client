@@ -55,11 +55,7 @@ func dialTLS(address, caCert, clientCert string) (*tls.Conn, error) {
 	return conn, conn.Handshake()
 }
 
-func newUDPAuthSession(address, sharedSecret, mtuSize string) (*radius.AuthenticationSession, error) {
-	mtu, err := strconv.Atoi(mtuSize)
-	if err != nil {
-		return nil, fmt.Errorf("invalid integer for MTU: %s", mtuSize)
-	}
+func newUDPAuthSession(address, sharedSecret string, mtuSize int) (*radius.AuthenticationSession, error) {
 	to, err := time.ParseDuration(udpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)
@@ -70,9 +66,9 @@ func newUDPAuthSession(address, sharedSecret, mtuSize string) (*radius.Authentic
 	}
 	sendAttrs := map[radius.AttributeType]string{
 		radius.AttributeTypeNasIdentifier: "radius-client",
-		radius.AttributeTypeFramedMtu:     mtuSize,
+		radius.AttributeTypeFramedMtu:     strconv.Itoa(mtuSize),
 	}
-	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, mtu, sendAttrs)
+	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, mtuSize, sendAttrs)
 }
 
 func newUDPAcctSession(address, sharedSecret string) (*radius.AccountingSession, error) {
