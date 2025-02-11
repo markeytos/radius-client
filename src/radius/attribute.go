@@ -282,134 +282,339 @@ const (
 	AttributeTypeMessageAuthenticator AttributeType = 80
 )
 
+type AttributeTypeLabel string
+
+const (
+	AttributeTypeLabelUserName               AttributeTypeLabel = "User-Name"
+	AttributeTypeLabelUserPassword           AttributeTypeLabel = "User-Password"
+	AttributeTypeLabelChapPassword           AttributeTypeLabel = "CHAP-Password"
+	AttributeTypeLabelNasIpAddress           AttributeTypeLabel = "NAS-IP-Address"
+	AttributeTypeLabelNasPort                AttributeTypeLabel = "NAS-Port"
+	AttributeTypeLabelServiceType            AttributeTypeLabel = "Service-Type"
+	AttributeTypeLabelFramedProtocol         AttributeTypeLabel = "Framed-Protocol"
+	AttributeTypeLabelFramedIpAddress        AttributeTypeLabel = "Framed-IP-Address"
+	AttributeTypeLabelFramedIpNetmask        AttributeTypeLabel = "Framed-IP-Netmask"
+	AttributeTypeLabelFramedRouting          AttributeTypeLabel = "Framed-Routing"
+	AttributeTypeLabelFilterId               AttributeTypeLabel = "Filter-Id"
+	AttributeTypeLabelFramedMtu              AttributeTypeLabel = "Framed-MTU"
+	AttributeTypeLabelFramedCompression      AttributeTypeLabel = "Framed-Compression"
+	AttributeTypeLabelLoginIpHost            AttributeTypeLabel = "Login-IP-Host"
+	AttributeTypeLabelLoginService           AttributeTypeLabel = "Login-Service"
+	AttributeTypeLabelLoginTcpPort           AttributeTypeLabel = "Login-TCP-Port"
+	AttributeTypeLabelReplyMessage           AttributeTypeLabel = "Reply-Message"
+	AttributeTypeLabelCallbackNumber         AttributeTypeLabel = "Callback-Number"
+	AttributeTypeLabelCallbackId             AttributeTypeLabel = "Callback-Id"
+	AttributeTypeLabelFramedRoute            AttributeTypeLabel = "Framed-Route"
+	AttributeTypeLabelFramedIpxNetwork       AttributeTypeLabel = "Framed-IPX-Network"
+	AttributeTypeLabelState                  AttributeTypeLabel = "State"
+	AttributeTypeLabelClass                  AttributeTypeLabel = "Class"
+	AttributeTypeLabelVendorSpecific         AttributeTypeLabel = "Vendor-Specific"
+	AttributeTypeLabelSessionTimeout         AttributeTypeLabel = "Session-Timeout"
+	AttributeTypeLabelIdleTimeout            AttributeTypeLabel = "Idle-Timeout"
+	AttributeTypeLabelTerminationAction      AttributeTypeLabel = "Termination-Action"
+	AttributeTypeLabelCalledStationId        AttributeTypeLabel = "Called-Station-Id"
+	AttributeTypeLabelCallingStationId       AttributeTypeLabel = "Calling-Station-Id"
+	AttributeTypeLabelNasIdentifier          AttributeTypeLabel = "NAS-Identifier"
+	AttributeTypeLabelProxyState             AttributeTypeLabel = "Proxy-State"
+	AttributeTypeLabelLoginLatService        AttributeTypeLabel = "Login-LAT-Service"
+	AttributeTypeLabelLoginLatNode           AttributeTypeLabel = "Login-LAT-Node"
+	AttributeTypeLabelLoginLatGroup          AttributeTypeLabel = "Login-LAT-Group"
+	AttributeTypeLabelFramedAppleTalkLink    AttributeTypeLabel = "Framed-AppleTalk-Link"
+	AttributeTypeLabelFramedAppleTalkNetwork AttributeTypeLabel = "Framed-AppleTalk-Network"
+	AttributeTypeLabelFramedAppleTalkZone    AttributeTypeLabel = "Framed-AppleTalk-Zone"
+	AttributeTypeLabelErrorCause             AttributeTypeLabel = "Error-Cause"
+
+	AttributeTypeLabelAcctStatusType     AttributeTypeLabel = "Acct-Status-Type"
+	AttributeTypeLabelAcctDelayTime      AttributeTypeLabel = "Acct-Delay-Time"
+	AttributeTypeLabelAcctInputOctets    AttributeTypeLabel = "Acct-Input-Octets"
+	AttributeTypeLabelAcctOutputOctets   AttributeTypeLabel = "Acct-Output-Octets"
+	AttributeTypeLabelAcctSessionId      AttributeTypeLabel = "Acct-Session-Id"
+	AttributeTypeLabelAcctAuthentic      AttributeTypeLabel = "Acct-Authentic"
+	AttributeTypeLabelAcctSessionTime    AttributeTypeLabel = "Acct-Session-Time"
+	AttributeTypeLabelAcctInputPackets   AttributeTypeLabel = "Acct-Input-Packets"
+	AttributeTypeLabelAcctOutputPackets  AttributeTypeLabel = "Acct-Output-Packets"
+	AttributeTypeLabelAcctTerminateCause AttributeTypeLabel = "Acct-Terminate-Cause"
+	AttributeTypeLabelAcctMultiSessionId AttributeTypeLabel = "Acct-Multi-Session-Id"
+	AttributeTypeLabelAcctLinkCount      AttributeTypeLabel = "Acct-Link-Count"
+
+	AttributeTypeLabelChapChallenge AttributeTypeLabel = "CHAP-Challenge"
+	AttributeTypeLabelNasPortType   AttributeTypeLabel = "NAS-Port-Type"
+	AttributeTypeLabelPortLimit     AttributeTypeLabel = "Port-Limit"
+	AttributeTypeLabelLoginLatPort  AttributeTypeLabel = "Login-LAT-Port"
+
+	AttributeTypeLabelTunnelType           AttributeTypeLabel = "Tunnel-Type"
+	AttributeTypeLabelTunnelMediumType     AttributeTypeLabel = "Tunnel-Medium-Type"
+	AttributeTypeLabelTunnelPrivateGroupId AttributeTypeLabel = "Tunnel-Private-Group-ID"
+
+	AttributeTypeLabelEgressVlanId      AttributeTypeLabel = "Egress-VLANID"
+	AttributeTypeLabelIngressFilters    AttributeTypeLabel = "Ingress-Filters"
+	AttributeTypeLabelEgressVlanName    AttributeTypeLabel = "Egress-VLAN-Name"
+	AttributeTypeLabelUserPriorityTable AttributeTypeLabel = "User-Priority-Table"
+
+	AttributeTypeLabelEapMessage           AttributeTypeLabel = "EAP-Message"
+	AttributeTypeLabelMessageAuthenticator AttributeTypeLabel = "Message-Authenticator"
+)
+
+func AttributeTypeFromString(label string) (AttributeType, error) {
+	switch AttributeTypeLabel(label) {
+	case AttributeTypeLabelUserName:
+		return AttributeTypeUserName, nil
+	case AttributeTypeLabelUserPassword:
+		return AttributeTypeUserPassword, nil
+	case AttributeTypeLabelChapPassword:
+		return AttributeTypeChapPassword, nil
+	case AttributeTypeLabelNasIpAddress:
+		return AttributeTypeNasIpAddress, nil
+	case AttributeTypeLabelNasPort:
+		return AttributeTypeNasPort, nil
+	case AttributeTypeLabelServiceType:
+		return AttributeTypeServiceType, nil
+	case AttributeTypeLabelFramedProtocol:
+		return AttributeTypeFramedProtocol, nil
+	case AttributeTypeLabelFramedIpAddress:
+		return AttributeTypeFramedIpAddress, nil
+	case AttributeTypeLabelFramedIpNetmask:
+		return AttributeTypeFramedIpNetmask, nil
+	case AttributeTypeLabelFramedRouting:
+		return AttributeTypeFramedRouting, nil
+	case AttributeTypeLabelFilterId:
+		return AttributeTypeFilterId, nil
+	case AttributeTypeLabelFramedMtu:
+		return AttributeTypeFramedMtu, nil
+	case AttributeTypeLabelFramedCompression:
+		return AttributeTypeFramedCompression, nil
+	case AttributeTypeLabelLoginIpHost:
+		return AttributeTypeLoginIpHost, nil
+	case AttributeTypeLabelLoginService:
+		return AttributeTypeLoginService, nil
+	case AttributeTypeLabelLoginTcpPort:
+		return AttributeTypeLoginTcpPort, nil
+	case AttributeTypeLabelReplyMessage:
+		return AttributeTypeReplyMessage, nil
+	case AttributeTypeLabelCallbackNumber:
+		return AttributeTypeCallbackNumber, nil
+	case AttributeTypeLabelCallbackId:
+		return AttributeTypeCallbackId, nil
+	case AttributeTypeLabelFramedRoute:
+		return AttributeTypeFramedRoute, nil
+	case AttributeTypeLabelFramedIpxNetwork:
+		return AttributeTypeFramedIpxNetwork, nil
+	case AttributeTypeLabelState:
+		return AttributeTypeState, nil
+	case AttributeTypeLabelClass:
+		return AttributeTypeClass, nil
+	case AttributeTypeLabelVendorSpecific:
+		return AttributeTypeVendorSpecific, nil
+	case AttributeTypeLabelSessionTimeout:
+		return AttributeTypeSessionTimeout, nil
+	case AttributeTypeLabelIdleTimeout:
+		return AttributeTypeIdleTimeout, nil
+	case AttributeTypeLabelTerminationAction:
+		return AttributeTypeTerminationAction, nil
+	case AttributeTypeLabelCalledStationId:
+		return AttributeTypeCalledStationId, nil
+	case AttributeTypeLabelCallingStationId:
+		return AttributeTypeCallingStationId, nil
+	case AttributeTypeLabelNasIdentifier:
+		return AttributeTypeNasIdentifier, nil
+	case AttributeTypeLabelProxyState:
+		return AttributeTypeProxyState, nil
+	case AttributeTypeLabelLoginLatService:
+		return AttributeTypeLoginLatService, nil
+	case AttributeTypeLabelLoginLatNode:
+		return AttributeTypeLoginLatNode, nil
+	case AttributeTypeLabelLoginLatGroup:
+		return AttributeTypeLoginLatGroup, nil
+	case AttributeTypeLabelFramedAppleTalkLink:
+		return AttributeTypeFramedAppleTalkLink, nil
+	case AttributeTypeLabelFramedAppleTalkNetwork:
+		return AttributeTypeFramedAppleTalkNetwork, nil
+	case AttributeTypeLabelFramedAppleTalkZone:
+		return AttributeTypeFramedAppleTalkZone, nil
+	case AttributeTypeLabelErrorCause:
+		return AttributeTypeErrorCause, nil
+	case AttributeTypeLabelAcctStatusType:
+		return AttributeTypeAcctStatusType, nil
+	case AttributeTypeLabelAcctDelayTime:
+		return AttributeTypeAcctDelayTime, nil
+	case AttributeTypeLabelAcctInputOctets:
+		return AttributeTypeAcctInputOctets, nil
+	case AttributeTypeLabelAcctOutputOctets:
+		return AttributeTypeAcctOutputOctets, nil
+	case AttributeTypeLabelAcctSessionId:
+		return AttributeTypeAcctSessionId, nil
+	case AttributeTypeLabelAcctAuthentic:
+		return AttributeTypeAcctAuthentic, nil
+	case AttributeTypeLabelAcctSessionTime:
+		return AttributeTypeAcctSessionTime, nil
+	case AttributeTypeLabelAcctInputPackets:
+		return AttributeTypeAcctInputPackets, nil
+	case AttributeTypeLabelAcctOutputPackets:
+		return AttributeTypeAcctOutputPackets, nil
+	case AttributeTypeLabelAcctTerminateCause:
+		return AttributeTypeAcctTerminateCause, nil
+	case AttributeTypeLabelAcctMultiSessionId:
+		return AttributeTypeAcctMultiSessionId, nil
+	case AttributeTypeLabelAcctLinkCount:
+		return AttributeTypeAcctLinkCount, nil
+	case AttributeTypeLabelChapChallenge:
+		return AttributeTypeChapChallenge, nil
+	case AttributeTypeLabelNasPortType:
+		return AttributeTypeNasPortType, nil
+	case AttributeTypeLabelPortLimit:
+		return AttributeTypePortLimit, nil
+	case AttributeTypeLabelLoginLatPort:
+		return AttributeTypeLoginLatPort, nil
+	case AttributeTypeLabelTunnelType:
+		return AttributeTypeTunnelType, nil
+	case AttributeTypeLabelTunnelMediumType:
+		return AttributeTypeTunnelMediumType, nil
+	case AttributeTypeLabelTunnelPrivateGroupId:
+		return AttributeTypeTunnelPrivateGroupId, nil
+	case AttributeTypeLabelEgressVlanId:
+		return AttributeTypeEgressVlanId, nil
+	case AttributeTypeLabelIngressFilters:
+		return AttributeTypeIngressFilters, nil
+	case AttributeTypeLabelEgressVlanName:
+		return AttributeTypeEgressVlanName, nil
+	case AttributeTypeLabelUserPriorityTable:
+		return AttributeTypeUserPriorityTable, nil
+	case AttributeTypeLabelEapMessage:
+		return AttributeTypeEapMessage, nil
+	case AttributeTypeLabelMessageAuthenticator:
+		return AttributeTypeMessageAuthenticator, nil
+	}
+	return 0, fmt.Errorf("unknown attribute type label: %s", label)
+}
+
 func (t AttributeType) String() string {
 	switch t {
 	case AttributeTypeUserName:
-		return "User-Name"
+		return string(AttributeTypeLabelUserName)
 	case AttributeTypeUserPassword:
-		return "User-Password"
+		return string(AttributeTypeLabelUserPassword)
 	case AttributeTypeChapPassword:
-		return "CHAP-Password"
+		return string(AttributeTypeLabelChapPassword)
 	case AttributeTypeNasIpAddress:
-		return "NAS-IP-Address"
+		return string(AttributeTypeLabelNasIpAddress)
 	case AttributeTypeNasPort:
-		return "NAS-Port"
+		return string(AttributeTypeLabelNasPort)
 	case AttributeTypeServiceType:
-		return "Service-Type"
+		return string(AttributeTypeLabelServiceType)
 	case AttributeTypeFramedProtocol:
-		return "Framed-Protocol"
+		return string(AttributeTypeLabelFramedProtocol)
 	case AttributeTypeFramedIpAddress:
-		return "Framed-IP-Address"
+		return string(AttributeTypeLabelFramedIpAddress)
 	case AttributeTypeFramedIpNetmask:
-		return "Framed-IP-Netmask"
+		return string(AttributeTypeLabelFramedIpNetmask)
 	case AttributeTypeFramedRouting:
-		return "Framed-Routing"
+		return string(AttributeTypeLabelFramedRouting)
 	case AttributeTypeFilterId:
-		return "Filter-Id"
+		return string(AttributeTypeLabelFilterId)
 	case AttributeTypeFramedMtu:
-		return "Framed-MTU"
+		return string(AttributeTypeLabelFramedMtu)
 	case AttributeTypeFramedCompression:
-		return "Framed-Compression"
+		return string(AttributeTypeLabelFramedCompression)
 	case AttributeTypeLoginIpHost:
-		return "Login-IP-Host"
+		return string(AttributeTypeLabelLoginIpHost)
 	case AttributeTypeLoginService:
-		return "Login-Service"
+		return string(AttributeTypeLabelLoginService)
 	case AttributeTypeLoginTcpPort:
-		return "Login-TCP-Port"
+		return string(AttributeTypeLabelLoginTcpPort)
 	case AttributeTypeReplyMessage:
-		return "Reply-Message"
+		return string(AttributeTypeLabelReplyMessage)
 	case AttributeTypeCallbackNumber:
-		return "Callback-Number"
+		return string(AttributeTypeLabelCallbackNumber)
 	case AttributeTypeCallbackId:
-		return "Callback-Id"
+		return string(AttributeTypeLabelCallbackId)
 	case AttributeTypeFramedRoute:
-		return "Framed-Route"
+		return string(AttributeTypeLabelFramedRoute)
 	case AttributeTypeFramedIpxNetwork:
-		return "Framed-IPX-Network"
+		return string(AttributeTypeLabelFramedIpxNetwork)
 	case AttributeTypeState:
-		return "State"
+		return string(AttributeTypeLabelState)
 	case AttributeTypeClass:
-		return "Class"
+		return string(AttributeTypeLabelClass)
 	case AttributeTypeVendorSpecific:
-		return "Vendor-Specific"
+		return string(AttributeTypeLabelVendorSpecific)
 	case AttributeTypeSessionTimeout:
-		return "Session-Timeout"
+		return string(AttributeTypeLabelSessionTimeout)
 	case AttributeTypeIdleTimeout:
-		return "Idle-Timeout"
+		return string(AttributeTypeLabelIdleTimeout)
 	case AttributeTypeTerminationAction:
-		return "Termination-Action"
+		return string(AttributeTypeLabelTerminationAction)
 	case AttributeTypeCalledStationId:
-		return "Called-Station-Id"
+		return string(AttributeTypeLabelCalledStationId)
 	case AttributeTypeCallingStationId:
-		return "Calling-Station-Id"
+		return string(AttributeTypeLabelCallingStationId)
 	case AttributeTypeNasIdentifier:
-		return "NAS-Identifier"
+		return string(AttributeTypeLabelNasIdentifier)
 	case AttributeTypeProxyState:
-		return "Proxy-State"
+		return string(AttributeTypeLabelProxyState)
 	case AttributeTypeLoginLatService:
-		return "Login-LAT-Service"
+		return string(AttributeTypeLabelLoginLatService)
 	case AttributeTypeLoginLatNode:
-		return "Login-LAT-Node"
+		return string(AttributeTypeLabelLoginLatNode)
 	case AttributeTypeLoginLatGroup:
-		return "Login-LAT-Group"
+		return string(AttributeTypeLabelLoginLatGroup)
 	case AttributeTypeFramedAppleTalkLink:
-		return "Framed-AppleTalk-Link"
+		return string(AttributeTypeLabelFramedAppleTalkLink)
 	case AttributeTypeFramedAppleTalkNetwork:
-		return "Framed-AppleTalk-Network"
+		return string(AttributeTypeLabelFramedAppleTalkNetwork)
 	case AttributeTypeFramedAppleTalkZone:
-		return "Framed-AppleTalk-Zone"
+		return string(AttributeTypeLabelFramedAppleTalkZone)
 	case AttributeTypeErrorCause:
-		return "Error-Cause"
+		return string(AttributeTypeLabelErrorCause)
 	case AttributeTypeAcctStatusType:
-		return "Acct-Status-Type"
+		return string(AttributeTypeLabelAcctStatusType)
 	case AttributeTypeAcctDelayTime:
-		return "Acct-Delay-Time"
+		return string(AttributeTypeLabelAcctDelayTime)
 	case AttributeTypeAcctInputOctets:
-		return "Acct-Input-Octets"
+		return string(AttributeTypeLabelAcctInputOctets)
 	case AttributeTypeAcctOutputOctets:
-		return "Acct-Output-Octets"
+		return string(AttributeTypeLabelAcctOutputOctets)
 	case AttributeTypeAcctSessionId:
-		return "Acct-Session-Id"
+		return string(AttributeTypeLabelAcctSessionId)
 	case AttributeTypeAcctAuthentic:
-		return "Acct-Authentic"
+		return string(AttributeTypeLabelAcctAuthentic)
 	case AttributeTypeAcctSessionTime:
-		return "Acct-Session-Time"
+		return string(AttributeTypeLabelAcctSessionTime)
 	case AttributeTypeAcctInputPackets:
-		return "Acct-Input-Packets"
+		return string(AttributeTypeLabelAcctInputPackets)
 	case AttributeTypeAcctOutputPackets:
-		return "Acct-Output-Packets"
+		return string(AttributeTypeLabelAcctOutputPackets)
 	case AttributeTypeAcctTerminateCause:
-		return "Acct-Terminate-Cause"
+		return string(AttributeTypeLabelAcctTerminateCause)
 	case AttributeTypeAcctMultiSessionId:
-		return "Acct-Multi-Session-Id"
+		return string(AttributeTypeLabelAcctMultiSessionId)
 	case AttributeTypeAcctLinkCount:
-		return "Acct-Link-Count"
+		return string(AttributeTypeLabelAcctLinkCount)
 	case AttributeTypeChapChallenge:
-		return "CHAP-Challenge"
+		return string(AttributeTypeLabelChapChallenge)
 	case AttributeTypeNasPortType:
-		return "NAS-Port-Type"
+		return string(AttributeTypeLabelNasPortType)
 	case AttributeTypePortLimit:
-		return "Port-Limit"
+		return string(AttributeTypeLabelPortLimit)
 	case AttributeTypeLoginLatPort:
-		return "Login-LAT-Port"
+		return string(AttributeTypeLabelLoginLatPort)
 	case AttributeTypeTunnelType:
-		return "Tunnel-Type"
+		return string(AttributeTypeLabelTunnelType)
 	case AttributeTypeTunnelMediumType:
-		return "Tunnel-Medium-Type"
+		return string(AttributeTypeLabelTunnelMediumType)
 	case AttributeTypeTunnelPrivateGroupId:
-		return "Tunnel-Private-Group-ID"
+		return string(AttributeTypeLabelTunnelPrivateGroupId)
 	case AttributeTypeEgressVlanId:
-		return "Egress-VLANID"
+		return string(AttributeTypeLabelEgressVlanId)
 	case AttributeTypeIngressFilters:
-		return "Ingress-Filters"
+		return string(AttributeTypeLabelIngressFilters)
 	case AttributeTypeEgressVlanName:
-		return "Egress-VLAN-Name"
+		return string(AttributeTypeLabelEgressVlanName)
 	case AttributeTypeUserPriorityTable:
-		return "User-Priority-Table"
+		return string(AttributeTypeLabelUserPriorityTable)
 	case AttributeTypeEapMessage:
-		return "EAP-Message"
+		return string(AttributeTypeLabelEapMessage)
 	case AttributeTypeMessageAuthenticator:
-		return "Message-Authenticator"
+		return string(AttributeTypeLabelMessageAuthenticator)
 	}
 	return fmt.Sprintf("Unknown (%d)", t)
 }
