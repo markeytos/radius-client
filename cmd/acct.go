@@ -28,7 +28,6 @@ var acctUdpCmd = &cobra.Command{
 		defer session.Close()
 		return fmt.Errorf("acct: not implemented")
 	},
-	SilenceUsage: true,
 }
 
 var acctTlsCmd = &cobra.Command{
@@ -43,7 +42,6 @@ var acctTlsCmd = &cobra.Command{
 		defer session.Close()
 		return fmt.Errorf("acct: not implemented")
 	},
-	SilenceUsage: true,
 }
 
 func init() {

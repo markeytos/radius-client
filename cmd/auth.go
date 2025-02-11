@@ -77,7 +77,6 @@ var authUdpCmd = &cobra.Command{
 			return newUDPAuthSession(args[0], args[1], udpMTUSize)
 		}, args[2])
 	},
-	SilenceUsage: true,
 }
 
 var authTlsCmd = &cobra.Command{
@@ -90,7 +89,6 @@ var authTlsCmd = &cobra.Command{
 			return newTLSAuthSession(args[0], args[1], args[2])
 		}, args[3])
 	},
-	SilenceUsage: true,
 }
 
 func init() {
