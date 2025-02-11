@@ -25,7 +25,6 @@ var statusUdpAuthCmd = &cobra.Command{
 			return newUDPAuthSession(args[0], args[1], udpMTUSize)
 		})
 	},
-	SilenceUsage: true,
 }
 
 var statusUdpAcctCmd = &cobra.Command{
@@ -37,7 +36,6 @@ var statusUdpAcctCmd = &cobra.Command{
 			return newUDPAcctSession(args[0], args[1])
 		})
 	},
-	SilenceUsage: true,
 }
 
 var statusTlsCmd = &cobra.Command{
@@ -49,7 +47,6 @@ var statusTlsCmd = &cobra.Command{
 			return newTLSAuthSession(args[0], args[1], args[2])
 		})
 	},
-	SilenceUsage: true,
 }
 
 func init() {
