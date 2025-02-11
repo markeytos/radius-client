@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -24,9 +25,31 @@ type session struct {
 	retries             int
 	mtuSize             int
 	sendAttributes      []*Attribute
+	recvAttributes      []*Attribute
 	replyOnceAttributes []*Attribute
 	lastReadDatagram    *Datagram
 	lastWrittenDatagram *Datagram
+}
+
+func newSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*session, error) {
+	sendattrs, err := serializeAttributeMap(sendattrsMap)
+	if err != nil {
+		return nil, err
+	}
+	recvattrs, err := serializeAttributeMap(recvattrsMap)
+	if err != nil {
+		return nil, err
+	}
+	return &session{
+		Conn:           conn,
+		identifier:     randUint8(),
+		sharedSecret:   ss,
+		timeout:        timeout,
+		retries:        retries,
+		mtuSize:        mtuSize,
+		sendAttributes: sendattrs,
+		recvAttributes: recvattrs,
+	}, nil
 }
 
 func (s *session) newRequestHeader(c Code) *Header {
@@ -124,6 +147,28 @@ func (s *session) WriteReadDatagram(wd *Datagram, rd *Datagram) error {
 	_, err = s.ReadDatagram(rd)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s *session) lastReadDatagramHasExpectedAttributes() error {
+	if s.lastReadDatagram == nil {
+		return fmt.Errorf("session has not read a datagram")
+	}
+	expectedAttrs := make([]string, 0)
+	for _, expected := range s.recvAttributes {
+		matched := false
+		for _, attr := range s.lastReadDatagram.Attributes {
+			if expected.Type == attr.Type && subtle.ConstantTimeCompare(expected.Value, attr.Value) == 1 {
+				matched = true
+			}
+		}
+		if !matched {
+			expectedAttrs = append(expectedAttrs, expected.Type.String())
+		}
+	}
+	if len(expectedAttrs) > 0 {
+		return fmt.Errorf("expected attributes were missing or had different values: %s", strings.Join(expectedAttrs, ", "))
 	}
 	return nil
 }

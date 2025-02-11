@@ -176,7 +176,12 @@ func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 			AttributeTypeTunnelType,
 			AttributeTypeTunnelMediumType,
 			AttributeTypeIngressFilters:
-			return attrs, fmt.Errorf("TODO: enums not implemented yet")
+			a := newEmptyAttribute(t, 4)
+			err := ParseAttributeEnumData(a.Value, t, v)
+			if err != nil {
+				return attrs, err
+			}
+			attrs = append(attrs, a)
 		case AttributeTypeVendorSpecific:
 			return attrs, fmt.Errorf("TODO: VSA not implemented yet")
 		case AttributeTypeEgressVlanId:
@@ -201,7 +206,7 @@ func (as Attributes) FirstOfType(t AttributeType) *Attribute {
 	return nil
 }
 
-func (as *Attributes) ContainsOfType(t AttributeType) bool {
+func (as *Attributes) ContainsType(t AttributeType) bool {
 	return as.FirstOfType(t) != nil
 }
 

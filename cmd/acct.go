@@ -21,7 +21,7 @@ var acctUdpCmd = &cobra.Command{
 	Short: "RADIUS/UDP client accounting",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		session, err := newUDPAcctSession(args[0], args[1])
+		session, err := newUDPAcctSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
 		if err != nil {
 			return fmt.Errorf("acct: failed to create udp session: %w", err)
 		}
@@ -35,7 +35,7 @@ var acctTlsCmd = &cobra.Command{
 	Short: "RADIUS/TLS client accounting",
 	Args:  cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		session, err := newTLSAcctSession(args[0], args[1], args[2])
+		session, err := newTLSAcctSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
 		if err != nil {
 			return fmt.Errorf("acct: failed to create tls session: %w", err)
 		}
