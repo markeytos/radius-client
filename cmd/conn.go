@@ -22,7 +22,13 @@ type statusSession interface {
 }
 
 func dialUDP(ip string, port int) (net.Conn, error) {
-	d := net.Dialer{Timeout: 10 * time.Second}
+	d := net.Dialer{
+		LocalAddr: &net.UDPAddr{
+			IP:   net.IPv4zero,
+			Port: 0,
+		},
+		Timeout: 10 * time.Second,
+	}
 	return d.Dial("udp", fmt.Sprintf("%s:%d", ip, port))
 }
 
