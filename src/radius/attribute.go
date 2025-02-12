@@ -118,6 +118,7 @@ func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 		case AttributeTypeState,
 			AttributeTypeClass,
 			AttributeTypeProxyState,
+			AttributeTypeEapMessage,
 			AttributeTypeLoginLatGroup,
 			AttributeTypeFramedAppleTalkZone,
 			AttributeTypeUserPriorityTable:

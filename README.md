@@ -127,6 +127,49 @@ $RADIUS_COMMAND eap-tls --tunnel-ca-cert $SERVER_CA_CERT_PATH \
 The default TLS version supported is 1.2, 1.3 is supported but has not been tested,
 and it can be enabled by adding the flag `--tls-version 1.X`.
 
+### Attributes
+
+RADIUS servers can be configured to expect and behave differently depending on the
+set of attributes sent. This can be tested and verified by defining attributes that
+the client should send in every packet in the handshake, and all the attributes it
+expects to receive in a successful final packet.
+
+- `--attrs-to-send`: Define attributes to be sent in all packets sent to the server
+- `--attrs-to-recv`: Define attributes that the server must send on successful handshakes
+
+These can be used in the following format:
+
+```bash
+$RADIUS_COMMAND $AUTHENTICATION_PROTOCOL $AUTHENTICATION_PROTOCOL_PARAMETERS \
+    --attrs-to-send $ATTRIBUTE_TYPE:$ATTRIBUTE_VALUE \
+    --attrs-to-recv $ATTRIBUTE_TYPE:$ATTRIBUTE_VALUE
+```
+
+> [!NOTE]
+> Keep in mind that some attributes should not be sent as they may be utilized by
+> the authentication protocol and will be overwritten or require different treatment,
+> such as `User-Password`.
+
+You can also send multiple attributes and expect multiple attributes. Each attribute
+type cannot be defined more than once for each direction for simplicity's sake. Below
+is an example of how to define multiple attributes to be sent and received in `pap`
+authentication:
+
+```bash
+$RADIUS_COMMAND pap --username test_user --password test_password \
+    --attrs-to-send NAS-Identifier:fake-router \
+    --attrs-to-send Framed-Protocol:PPP \
+    --attrs-to-recv Framed-Protocol:PPP \
+    --attrs-to-recv Service-Type:Framed \
+    --attrs-to-recv Filter-Id:20
+```
+
+In the example above, the client attempts to authenticate with `pap`, sends two
+additional attributes to the server, and expects three attributes from the server
+in the `Access-Accept` packet.
+
+You can view all attributes and their values can be defined in this [document](./RADIUS_ATTRIBUTES.md).
+
 ## Relevant RFCs And Documents
 
 - [RFC 2759: MS-CHAP-V2](https://datatracker.ietf.org/doc/html/rfc2759)

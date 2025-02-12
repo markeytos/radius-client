@@ -303,7 +303,7 @@ func ParseAttributeEnumTerminationAction(v string) (AttributeEnumTerminationActi
 	switch v {
 	case "Default":
 		return AttributeEnumTerminationActionDefault, nil
-	case "RadiusRequest":
+	case "RADIUS-Request":
 		return AttributeEnumTerminationActionRadiusRequest, nil
 	default:
 		return 0, fmt.Errorf("invalid termination action value: %s", v)
