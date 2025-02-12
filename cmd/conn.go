@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"maps"
 	"net"
 	"os"
 	"strconv"
@@ -71,10 +70,10 @@ func newUDPAuthSession(address, sharedSecret string, mtuSize int, sendattrs, rec
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	maps.Copy(sendattrs, radius.AttributeMap{
-		radius.AttributeTypeNasIdentifier: "radius-client",
-		radius.AttributeTypeFramedMtu:     strconv.Itoa(mtuSize),
-	})
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; ok == false {
+		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+	}
+	sendattrs[radius.AttributeTypeFramedMtu] = strconv.Itoa(mtuSize)
 	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, mtuSize, sendattrs, recvattrs)
 }
 
@@ -87,10 +86,10 @@ func newUDPAcctSession(address, sharedSecret string, mtuSize int, sendattrs, rec
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	maps.Copy(sendattrs, radius.AttributeMap{
-		radius.AttributeTypeNasIdentifier: "radius-client",
-		radius.AttributeTypeFramedMtu:     strconv.Itoa(mtuSize),
-	})
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; ok == false {
+		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+	}
+	sendattrs[radius.AttributeTypeFramedMtu] = strconv.Itoa(mtuSize)
 	return radius.NewAccountingSession(conn, sharedSecret, to, udpRetries, mtuSize, sendattrs, recvattrs)
 }
 
@@ -103,9 +102,9 @@ func newTLSAuthSession(address, serverCA, clientCer string, sendattrs, recvattrs
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	maps.Copy(sendattrs, radius.AttributeMap{
-		radius.AttributeTypeNasIdentifier: "radius-client",
-	})
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; ok == false {
+		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+	}
 	return radius.NewAuthenticationSession(conn, "radsec", to, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
 }
 
@@ -118,8 +117,8 @@ func newTLSAcctSession(address, serverCA, clientCer string, sendattrs, recvattrs
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	maps.Copy(sendattrs, radius.AttributeMap{
-		radius.AttributeTypeNasIdentifier: "radius-client",
-	})
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; ok == false {
+		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+	}
 	return radius.NewAccountingSession(conn, "radsec", to, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
 }
