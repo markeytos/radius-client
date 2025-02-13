@@ -6,6 +6,7 @@ Define RADIUS accounting session
 package radius
 
 import (
+	"crypto/md5"
 	"fmt"
 	"net"
 	"time"
@@ -45,4 +46,55 @@ func (s *AccountingSession) Status() error {
 		return fmt.Errorf("missing message authenticator in response")
 	}
 	return s.lastReadDatagramHasExpectedAttributes()
+}
+
+func (s *AccountingSession) Account() error {
+	if !s.sendAttributes.ContainsType(AttributeTypeAcctStatusType) {
+		return fmt.Errorf("acct: missing attribute Acct-Status-Type")
+	}
+	if !s.sendAttributes.ContainsType(AttributeTypeAcctSessionId) {
+		return fmt.Errorf("acct: missing attribute Acct-Session-Id")
+	}
+
+	sd, err := s.newAccountingRequestDatagram()
+	if err != nil {
+		return err
+	}
+	rd := &Datagram{}
+	err = s.WriteReadDatagram(sd, rd)
+	if err != nil {
+		return fmt.Errorf("acct: %w", err)
+	}
+
+	if rd.Header.Code != CodeAccountingResponse {
+		a := rd.Attributes.FirstOfType(AttributeTypeReplyMessage)
+		if a == nil {
+			return fmt.Errorf("acct: accounting failed")
+		}
+		return fmt.Errorf("acct: accounting failed: %s", string(a.Value))
+	}
+	return s.lastReadDatagramHasExpectedAttributes()
+}
+
+func (s *AccountingSession) newAccountingRequestDatagram() (*Datagram, error) {
+	h := s.newAccountingRequestHeader()
+	d, err := s.newDatagram(h)
+	if err != nil {
+		return nil, err
+	}
+	hash := md5.New()
+	d.WriteTo(hash)
+	hash.Write([]byte(s.sharedSecret))
+	copy(h.Authenticator[:], hash.Sum(nil))
+	return d, nil
+}
+
+func (s *AccountingSession) newAccountingRequestHeader() *Header {
+	s.identifier++
+	h := &Header{
+		Code:       CodeAccountingRequest,
+		Identifier: s.identifier,
+		Length:     uint16(headerLen),
+	}
+	return h
 }

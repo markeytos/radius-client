@@ -56,7 +56,7 @@ flags:
 
 ### Authentication
 
-All authentication protocols supported by this client can be tested agains a Classic
+All authentication protocols supported by this client can be tested against a Classic
 RADIUS endpoint (unencrypted RADIUS over UDP), or over RadSec (encrypted and authenticated
 RADIUS over TCP-TLS).
 
@@ -64,10 +64,11 @@ The following examples will assume that either of the following is exported:
 
 ```bash
 # Classic RADIUS
-export RADIUS_COMMAND=radius-client auth udp $RADIUS_SERVER_ENDPOINT $SHARED_SECRET
+export RADIUS_AUTH_COMMAND=radius-client authentication udp \
+    $RADIUS_SERVER_ENDPOINT $SHARED_SECRET
 
 # If you want to test RadSec (RADIUS over TCP-TLS), use:
-export RADIUS_COMMAND=radius-client auth tls \
+export RADIUS_AUTH_COMMAND=radius-client authentication tls \
     $RADIUS_SERVER_ENDPOINT $RADSEC_SERVER_CA_PATH $RADSEC_CLIENT_CERT_PATH
 ```
 
@@ -79,7 +80,7 @@ flag. This flag will skip server authentication.
 To test MAC authentication bypass, run the following:
 
 ```bash
-$RADIUS_COMMAND mab --mac $MAC_ADDRESS
+$RADIUS_AUTH_COMMAND mab --mac $MAC_ADDRESS
 ```
 
 #### Password-based Authentication
@@ -88,10 +89,10 @@ To test basic password authentication, you can use the following:
 
 ```bash
 # Testing PAP
-$RADIUS_COMMAND pap --username $USERNAME --password $PASSWORD
+$RADIUS_AUTH_COMMAND pap --username $USERNAME --password $PASSWORD
 
 # Testing MS-CHAP-V2
-$RADIUS_COMMAND eap-ms-chapv2 --username $USERNAME --password $PASSWORD
+$RADIUS_AUTH_COMMAND eap-ms-chapv2 --username $USERNAME --password $PASSWORD
 ```
 
 For password-based authentication schemes that run over an internal TLS tunnel, here
@@ -99,15 +100,15 @@ are the commands to test them:
 
 ```bash
 # Testing PAP over EAP-TTLS
-$RADIUS_COMMAND eap-ttls-pap --tunnel-ca-cert $SERVER_CA_CERT_PATH \
+$RADIUS_AUTH_COMMAND eap-ttls-pap --tunnel-ca-cert $SERVER_CA_CERT_PATH \
     --username $USERNAME --password $PASSWORD
 
 # Testing MS-CHAP-V2 over EAP-TTLS
-$RADIUS_COMMAND eap-ttls-eap-ms-chapv2 --tunnel-ca-cert $SERVER_CA_CERT_PATH \
+$RADIUS_AUTH_COMMAND eap-ttls-eap-ms-chapv2 --tunnel-ca-cert $SERVER_CA_CERT_PATH \
     --username $USERNAME --password $PASSWORD
 
 # Testing MS-CHAP-V2 over PEAP
-$RADIUS_COMMAND peap-ms-chapv2 --tunnel-ca-cert $SERVER_CA_CERT_PATH \
+$RADIUS_AUTH_COMMAND peap-ms-chapv2 --tunnel-ca-cert $SERVER_CA_CERT_PATH \
     --username $USERNAME --password $PASSWORD
 ```
 
@@ -117,10 +118,10 @@ Two variants of TLS can be tested, basic EAP-TLS and EAP-TLS inside a EAP-TTLS t
 
 ```bash
 # Testing EAP-TLS
-$RADIUS_COMMAND eap-tls --client-cert $CLIENT_CERT_PATH --ca-cert $SERVER_CA_CERT_PATH
+$RADIUS_AUTH_COMMAND eap-tls --client-cert $CLIENT_CERT_PATH --ca-cert $SERVER_CA_CERT_PATH
 
 # Testing EAP-TLS over EAP-TTLS
-$RADIUS_COMMAND eap-tls --tunnel-ca-cert $SERVER_CA_CERT_PATH \
+$RADIUS_AUTH_COMMAND eap-tls --tunnel-ca-cert $SERVER_CA_CERT_PATH \
     --client-cert $CLIENT_CERT_PATH --ca-cert $SERVER_CA_CERT_PATH
 ```
 
@@ -140,7 +141,7 @@ expects to receive in a successful final packet.
 These can be used in the following format:
 
 ```bash
-$RADIUS_COMMAND $AUTHENTICATION_PROTOCOL $AUTHENTICATION_PROTOCOL_PARAMETERS \
+$RADIUS_AUTH_COMMAND $AUTHENTICATION_PROTOCOL $AUTHENTICATION_PROTOCOL_PARAMETERS \
     --attrs-to-send $ATTRIBUTE_TYPE:$ATTRIBUTE_VALUE \
     --attrs-to-recv $ATTRIBUTE_TYPE:$ATTRIBUTE_VALUE
 ```
@@ -156,7 +157,7 @@ is an example of how to define multiple attributes to be sent and received in `p
 authentication:
 
 ```bash
-$RADIUS_COMMAND pap --username test_user --password test_password \
+$RADIUS_AUTH_COMMAND pap --username test_user --password test_password \
     --attrs-to-send NAS-Identifier:fake-router \
     --attrs-to-send Framed-Protocol:PPP \
     --attrs-to-recv Framed-Protocol:PPP \
@@ -169,6 +170,33 @@ additional attributes to the server, and expects three attributes from the serve
 in the `Access-Accept` packet.
 
 You can view all attributes and their values can be defined in this [document](./RADIUS_ATTRIBUTES.md).
+
+### Accounting
+
+Accounting can be tested against a Classic RADIUS endpoint and RadSec.
+
+The following examples will assume that either of the following is exported:
+
+```bash
+# Classic RADIUS
+export RADIUS_ACCT_COMMAND=radius-client accounting udp \
+    $RADIUS_SERVER_ENDPOINT $SHARED_SECRET
+
+# If you want to test RadSec (RADIUS over TCP-TLS), use:
+export RADIUS_ACCT_COMMAND=radius-client accounting tls \
+    $RADIUS_SERVER_ENDPOINT $RADSEC_SERVER_CA_PATH $RADSEC_CLIENT_CERT_PATH
+```
+
+An accounting request **must** contain both `Acct-Status-Type` and `Acct-Session-Id`
+attributes. These are passed via the `--attrs-to-send` flag. For example:
+
+```bash
+$RADIUS_ACCT_COMMAND --attrs-to-send Acct-Status-Type:Start --attrs-to-send Acct-Session-Id:1234
+```
+
+Additional accounting values can be passed by adding the other accounting attributes,
+which can be found in [the list of attributes](./RADIUS_ATTRIBUTES.md). Accounting-specific
+attributes generally have a `Acct-` prefix.
 
 ## Relevant RFCs And Documents
 
