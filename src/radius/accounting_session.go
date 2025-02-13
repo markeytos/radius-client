@@ -15,16 +15,12 @@ type AccountingSession struct {
 	session
 }
 
-func NewAccountingSession(conn net.Conn, ss string, timeout time.Duration, retries int) *AccountingSession {
-	return &AccountingSession{
-		session: session{
-			Conn:         conn,
-			identifier:   randUint8(),
-			sharedSecret: ss,
-			timeout:      timeout,
-			retries:      retries,
-		},
+func NewAccountingSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*AccountingSession, error) {
+	session, err := newSession(conn, ss, timeout, retries, mtuSize, sendattrsMap, recvattrsMap)
+	if err != nil {
+		return nil, err
 	}
+	return &AccountingSession{session: *session}, nil
 }
 
 func (s *AccountingSession) Status() error {
@@ -45,8 +41,8 @@ func (s *AccountingSession) Status() error {
 	if rd.Header.Code != CodeAccountingResponse {
 		return fmt.Errorf("invalid status response code: %s", rd.Header.Code.String())
 	}
-	if !rd.Attributes.ContainsOfType(AttributeTypeMessageAuthenticator) {
+	if !rd.Attributes.ContainsType(AttributeTypeMessageAuthenticator) {
 		return fmt.Errorf("missing message authenticator in response")
 	}
-	return nil
+	return s.lastReadDatagramHasExpectedAttributes()
 }

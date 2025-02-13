@@ -18,22 +18,12 @@ type AuthenticationSession struct {
 	session
 }
 
-func NewAuthenticationSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSize int, sendattrsMap map[AttributeType]string) (*AuthenticationSession, error) {
-	sendattrs, err := serializeAttributeMap(sendattrsMap)
+func NewAuthenticationSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*AuthenticationSession, error) {
+	session, err := newSession(conn, ss, timeout, retries, mtuSize, sendattrsMap, recvattrsMap)
 	if err != nil {
 		return nil, err
 	}
-	return &AuthenticationSession{
-		session: session{
-			Conn:           conn,
-			identifier:     randUint8(),
-			sharedSecret:   ss,
-			timeout:        timeout,
-			retries:        retries,
-			mtuSize:        mtuSize,
-			sendAttributes: sendattrs,
-		},
-	}, nil
+	return &AuthenticationSession{session: *session}, nil
 }
 
 func (s *AuthenticationSession) Status() error {
@@ -54,10 +44,10 @@ func (s *AuthenticationSession) Status() error {
 	if rd.Header.Code != CodeAccessAccept {
 		return fmt.Errorf("status: invalid status response code: %s", rd.Header.Code.String())
 	}
-	if !rd.Attributes.ContainsOfType(AttributeTypeMessageAuthenticator) {
+	if !rd.Attributes.ContainsType(AttributeTypeMessageAuthenticator) {
 		return fmt.Errorf("status: missing message authenticator in response")
 	}
-	return nil
+	return s.lastReadDatagramHasExpectedAttributes()
 }
 
 func (s *AuthenticationSession) MAB(macAddress string) error {
@@ -82,7 +72,7 @@ func (s *AuthenticationSession) MAB(macAddress string) error {
 		}
 		return fmt.Errorf("mab: authentication failed: %s", string(a.Value))
 	}
-	return nil
+	return s.lastReadDatagramHasExpectedAttributes()
 }
 
 func (s *AuthenticationSession) PAP(username, password string) error {
@@ -110,7 +100,7 @@ func (s *AuthenticationSession) PAP(username, password string) error {
 		}
 		return fmt.Errorf("pap: authentication failed: %s", string(a.Value))
 	}
-	return nil
+	return s.lastReadDatagramHasExpectedAttributes()
 }
 
 func (s *AuthenticationSession) VerifyEAP(recvkey, sendkey []byte) error {
@@ -136,7 +126,7 @@ func (s *AuthenticationSession) VerifyEAP(recvkey, sendkey []byte) error {
 	if len(mismatchedKeys) > 0 {
 		return fmt.Errorf("eap: session key (%s) mismatch", strings.Join(mismatchedKeys, ", "))
 	}
-	return nil
+	return s.lastReadDatagramHasExpectedAttributes()
 }
 
 func (s *AuthenticationSession) sessionKeyEqual(key, reqauth, salt, enckey []byte) bool {

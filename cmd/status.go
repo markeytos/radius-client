@@ -22,7 +22,7 @@ var statusUdpAuthCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return status(func() (statusSession, error) {
-			return newUDPAuthSession(args[0], args[1], udpMTUSize)
+			return newUDPAuthSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
 		})
 	},
 }
@@ -33,7 +33,7 @@ var statusUdpAcctCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return status(func() (statusSession, error) {
-			return newUDPAcctSession(args[0], args[1])
+			return newUDPAcctSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
 		})
 	},
 }
@@ -44,7 +44,7 @@ var statusTlsCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return status(func() (statusSession, error) {
-			return newTLSAuthSession(args[0], args[1], args[2])
+			return newTLSAuthSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
 		})
 	},
 }

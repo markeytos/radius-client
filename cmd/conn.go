@@ -61,7 +61,7 @@ func dialTLS(address, caCert, clientCert string) (*tls.Conn, error) {
 	return conn, conn.Handshake()
 }
 
-func newUDPAuthSession(address, sharedSecret string, mtuSize int) (*radius.AuthenticationSession, error) {
+func newUDPAuthSession(address, sharedSecret string, mtuSize int, sendattrs, recvattrs radius.AttributeMap) (*radius.AuthenticationSession, error) {
 	to, err := time.ParseDuration(udpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)
@@ -70,14 +70,14 @@ func newUDPAuthSession(address, sharedSecret string, mtuSize int) (*radius.Authe
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	sendAttrs := map[radius.AttributeType]string{
-		radius.AttributeTypeNasIdentifier: "radius-client",
-		radius.AttributeTypeFramedMtu:     strconv.Itoa(mtuSize),
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; ok == false {
+		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
 	}
-	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, mtuSize, sendAttrs)
+	sendattrs[radius.AttributeTypeFramedMtu] = strconv.Itoa(mtuSize)
+	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, mtuSize, sendattrs, recvattrs)
 }
 
-func newUDPAcctSession(address, sharedSecret string) (*radius.AccountingSession, error) {
+func newUDPAcctSession(address, sharedSecret string, mtuSize int, sendattrs, recvattrs radius.AttributeMap) (*radius.AccountingSession, error) {
 	to, err := time.ParseDuration(udpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)
@@ -86,10 +86,14 @@ func newUDPAcctSession(address, sharedSecret string) (*radius.AccountingSession,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	return radius.NewAccountingSession(conn, sharedSecret, to, udpRetries), nil
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; ok == false {
+		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+	}
+	sendattrs[radius.AttributeTypeFramedMtu] = strconv.Itoa(mtuSize)
+	return radius.NewAccountingSession(conn, sharedSecret, to, udpRetries, mtuSize, sendattrs, recvattrs)
 }
 
-func newTLSAuthSession(address, serverCA, clientCer string) (*radius.AuthenticationSession, error) {
+func newTLSAuthSession(address, serverCA, clientCer string, sendattrs, recvattrs radius.AttributeMap) (*radius.AuthenticationSession, error) {
 	to, err := time.ParseDuration(tlsTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)
@@ -98,13 +102,13 @@ func newTLSAuthSession(address, serverCA, clientCer string) (*radius.Authenticat
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	sendAttrs := map[radius.AttributeType]string{
-		radius.AttributeTypeNasIdentifier: "radius-client",
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; ok == false {
+		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
 	}
-	return radius.NewAuthenticationSession(conn, "radsec", to, 1, radius.DatagramMaxLen, sendAttrs)
+	return radius.NewAuthenticationSession(conn, "radsec", to, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
 }
 
-func newTLSAcctSession(address, serverCA, clientCer string) (*radius.AccountingSession, error) {
+func newTLSAcctSession(address, serverCA, clientCer string, sendattrs, recvattrs radius.AttributeMap) (*radius.AccountingSession, error) {
 	to, err := time.ParseDuration(tlsTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %w", err)
@@ -113,5 +117,8 @@ func newTLSAcctSession(address, serverCA, clientCer string) (*radius.AccountingS
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	return radius.NewAccountingSession(conn, "radsec", to, 1), nil
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; ok == false {
+		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+	}
+	return radius.NewAccountingSession(conn, "radsec", to, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
 }
