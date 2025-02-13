@@ -16,7 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: golangci/golangci-lint-action@v6.1.1
-        args: --exclude 'golang.org/x/crypto/md4'
+        with:
+          args: --exclude 'golang.org/x/crypto/md4'
   fmt:
     runs-on: ubuntu-latest
     steps:
