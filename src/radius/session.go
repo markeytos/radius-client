@@ -24,9 +24,9 @@ type session struct {
 	timeout             time.Duration
 	retries             int
 	mtuSize             int
-	sendAttributes      []*Attribute
-	recvAttributes      []*Attribute
-	replyOnceAttributes []*Attribute
+	sendAttributes      Attributes
+	recvAttributes      Attributes
+	replyOnceAttributes Attributes
 	lastReadDatagram    *Datagram
 	lastWrittenDatagram *Datagram
 }

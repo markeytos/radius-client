@@ -68,7 +68,7 @@ var authCmd = &cobra.Command{
 }
 
 var authUdpCmd = &cobra.Command{
-	Use:     "udp IP_ADDRESS SHARED_SECRET PROTOCOL",
+	Use:     "udp ADDRESS SHARED_SECRET PROTOCOL",
 	Short:   "RADIUS/UDP client authentication",
 	Args:    cobra.ExactArgs(3),
 	PreRunE: prerun,
@@ -120,7 +120,7 @@ func auth(f func() (*radius.AuthenticationSession, error), protocol string) erro
 	defer session.Close()
 	err = internalAuth(session, protocol)
 	if err != nil {
-		slog.Error("failed auth",
+		slog.Error("failed authentication",
 			"network", session.RemoteAddr().Network(),
 			"address", session.RemoteAddr(),
 			"command", "auth",
