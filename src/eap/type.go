@@ -11,6 +11,7 @@ const (
 	TypeIdentity     Type = 1
 	TypeNotification Type = 2
 	TypeNAK          Type = 3
+	TypeMD5          Type = 4
 	TypeTLS          Type = 13
 	TypeTTLS         Type = 21
 	TypePEAP         Type = 25
