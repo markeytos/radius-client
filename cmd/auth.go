@@ -121,7 +121,16 @@ func auth(f func() (*radius.AuthenticationSession, error), protocol string) erro
 		)
 		return err
 	}
-	defer session.Close()
+	defer func() {
+		err := session.Close()
+		if err != nil {
+			slog.Error("failed to close session",
+				"command", "auth",
+				"protocol", protocol,
+				"error", err,
+			)
+		}
+	}()
 	err = internalAuth(session, protocol)
 	if err != nil {
 		slog.Error("failed authentication",
@@ -157,6 +166,10 @@ func internalAuth(session *radius.AuthenticationSession, protocol string) error 
 	}
 
 	eaptunnel := radius.NewEapAuthenticationTunnel(session, anonymousUsername)
+	if eaptunnel == nil {
+		return fmt.Errorf("failed to create EAP tunnel")
+	}
+	// nolint:errcheck // function does not return error
 	defer eaptunnel.Close()
 	eapsession := eap.NewSession(eaptunnel, anonymousUsername, eapSendStart)
 	err := eapAuth(eapsession, protocol)

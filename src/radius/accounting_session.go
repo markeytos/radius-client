@@ -82,10 +82,15 @@ func (s *AccountingSession) newAccountingRequestDatagram() (*Datagram, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	hash := md5.New()
-	d.WriteTo(hash)
+	_, err = d.WriteTo(hash)
+	if err != nil {
+		return nil, err
+	}
 	hash.Write([]byte(s.sharedSecret))
 	copy(h.Authenticator[:], hash.Sum(nil))
+
 	return d, nil
 }
 
