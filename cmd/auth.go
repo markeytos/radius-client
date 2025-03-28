@@ -16,6 +16,7 @@ import (
 // authentication protocols
 const (
 	authMAB                = "mab"
+	authMabEapMd5          = "mab-eap-md5"
 	authPAP                = "pap"
 	authEapMsCHAPv2        = "eap-ms-chapv2"
 	authEapTLS             = "eap-tls"
@@ -28,7 +29,10 @@ const (
 // required values for protocols
 // no sets in go, so using maps with empty structs
 var (
-	requireMACAddress          = map[string]struct{}{authMAB: {}}
+	requireMACAddress = map[string]struct{}{
+		authMAB:       {},
+		authMabEapMd5: {},
+	}
 	requireUsernameAndPassword = map[string]struct{}{
 		authPAP:                {},
 		authEapMsCHAPv2:        {},
@@ -117,7 +121,16 @@ func auth(f func() (*radius.AuthenticationSession, error), protocol string) erro
 		)
 		return err
 	}
-	defer session.Close()
+	defer func() {
+		err := session.Close()
+		if err != nil {
+			slog.Error("failed to close session",
+				"command", "auth",
+				"protocol", protocol,
+				"error", err,
+			)
+		}
+	}()
 	err = internalAuth(session, protocol)
 	if err != nil {
 		slog.Error("failed authentication",
@@ -145,11 +158,18 @@ func internalAuth(session *radius.AuthenticationSession, protocol string) error 
 	case authPAP:
 		return session.PAP(username, password)
 	}
-	if !strings.HasPrefix(protocol, "eap-") && !strings.HasPrefix(protocol, "peap-") {
+	if !strings.HasPrefix(protocol, "eap-") && !strings.HasPrefix(protocol, "peap-") && protocol != authMabEapMd5 {
 		return fmt.Errorf("unknown protocol picked: %s", protocol)
+	}
+	if protocol == authMabEapMd5 {
+		anonymousUsername = macAddress
 	}
 
 	eaptunnel := radius.NewEapAuthenticationTunnel(session, anonymousUsername)
+	if eaptunnel == nil {
+		return fmt.Errorf("failed to create EAP tunnel")
+	}
+	// nolint:errcheck // function does not return error
 	defer eaptunnel.Close()
 	eapsession := eap.NewSession(eaptunnel, anonymousUsername, eapSendStart)
 	err := eapAuth(eapsession, protocol)
@@ -161,6 +181,8 @@ func internalAuth(session *radius.AuthenticationSession, protocol string) error 
 
 func eapAuth(session *eap.Session, protocol string) error {
 	switch protocol {
+	case authMabEapMd5:
+		return session.MD5(macAddress)
 	case authEapMsCHAPv2:
 		return session.MsCHAPv2(username, password)
 	case authEapTLS:

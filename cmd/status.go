@@ -62,7 +62,15 @@ func status(f func() (statusSession, error)) error {
 		)
 		return err
 	}
-	defer session.Close()
+	defer func() {
+		err := session.Close()
+		if err != nil {
+			slog.Error("failed to close session",
+				"command", "status",
+				"error", err,
+			)
+		}
+	}()
 	err = session.Status()
 	if err != nil {
 		slog.Error("failed status",

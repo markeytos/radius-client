@@ -72,7 +72,7 @@ func (tt *PEAP) Close() error {
 	if err != nil {
 		return err
 	}
-	if !(rd.Header.Code == CodeRequest && rd.Content.Type == TypeExtensions) {
+	if rd.Header.Code != CodeRequest || rd.Content.Type != TypeExtensions {
 		return fmt.Errorf("peap: expected extension packet on close")
 	}
 	success := bytes.Equal(rd.Content.Data, []byte{0x80, 3, 0, 2, 0, 1})

@@ -51,7 +51,14 @@ func acct(f func() (*radius.AccountingSession, error)) error {
 			"error", err)
 		return err
 	}
-	defer session.Close()
+	defer func() {
+		err := session.Close()
+		if err != nil {
+			slog.Error("failed to close session",
+				"command", "acct",
+				"error", err)
+		}
+	}()
 	err = session.Account()
 	if err != nil {
 		slog.Error("failed accounting",

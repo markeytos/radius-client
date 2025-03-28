@@ -11,6 +11,7 @@ import (
 	"log"
 	"unicode/utf16"
 
+	// nolint:staticcheck // SA1019 protocol requires MD4
 	"golang.org/x/crypto/md4"
 )
 
