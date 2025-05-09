@@ -20,17 +20,19 @@ type TTLS struct {
 	client *tls.Conn
 }
 
-func CreateTTLS(session *Session, caCert, tlsVersion string) (*TTLS, error) {
-	t, err := internalCreateTLS(session, caCert, tlsVersion, TypeTTLS)
+func CreateTTLS(session *Session, caCert, tlsVersion, serverName string, tlsSkipHostnameCheck bool) (*TTLS, error) {
+	t, err := internalCreateTLS(session, caCert, tlsVersion, tlsSkipHostnameCheck, TypeTTLS)
 	if err != nil {
 		return nil, err
 	}
 	tlsConfig := &tls.Config{
 		RootCAs:                t.rootCAs,
-		InsecureSkipVerify:     true,
 		MinVersion:             t.tlsVersion,
 		MaxVersion:             t.tlsVersion,
 		SessionTicketsDisabled: true,
+		InsecureSkipVerify:     tlsSkipHostnameCheck,
+		ServerName:             serverName,
+		VerifyPeerCertificate:  t.verifyCertificateChain,
 	}
 	return &TTLS{TLS: t, client: tls.Client(t, tlsConfig)}, nil
 }
