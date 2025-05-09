@@ -8,6 +8,7 @@ package eap
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -32,18 +33,19 @@ func exportKeyingMaterial(client *tls.Conn, label string) (recv, send []byte, er
 
 type TLS struct {
 	*Session
-	rootCAs    *x509.CertPool
-	tlsVersion uint16
-	packetType Type
-	readBuffer []byte
-	readMore   bool
+	rootCAs           *x509.CertPool
+	tlsVersion        uint16
+	packetType        Type
+	readBuffer        []byte
+	readMore          bool
+	skipHostnameCheck bool
 }
 
-func CreateTLS(session *Session, caCert, tlsVersion string) (*TLS, error) {
-	return internalCreateTLS(session, caCert, tlsVersion, TypeTLS)
+func CreateTLS(session *Session, caCert, tlsVersion string, skipHostnameCheck bool) (*TLS, error) {
+	return internalCreateTLS(session, caCert, tlsVersion, skipHostnameCheck, TypeTLS)
 }
 
-func internalCreateTLS(session *Session, caCert, tlsVersion string, pt Type) (*TLS, error) {
+func internalCreateTLS(session *Session, caCert, tlsVersion string, skipHostnameCheck bool, pt Type) (*TLS, error) {
 	content, err := os.ReadFile(caCert)
 	if err != nil {
 		return nil, err
@@ -67,10 +69,11 @@ func internalCreateTLS(session *Session, caCert, tlsVersion string, pt Type) (*T
 	}
 
 	return &TLS{
-		Session:    session,
-		rootCAs:    rootCAs,
-		tlsVersion: tlsv,
-		packetType: pt,
+		Session:           session,
+		rootCAs:           rootCAs,
+		tlsVersion:        tlsv,
+		packetType:        pt,
+		skipHostnameCheck: skipHostnameCheck,
 	}, nil
 }
 
@@ -84,11 +87,13 @@ func (tt *TLS) Authenticate(certpath string) error {
 		return err
 	}
 	tlsConfig := &tls.Config{
-		RootCAs:      tt.rootCAs,
-		Certificates: []tls.Certificate{cert},
-		ServerName:   h,
-		MinVersion:   tt.tlsVersion,
-		MaxVersion:   tt.tlsVersion,
+		RootCAs:               tt.rootCAs,
+		Certificates:          []tls.Certificate{cert},
+		ServerName:            h,
+		MinVersion:            tt.tlsVersion,
+		MaxVersion:            tt.tlsVersion,
+		InsecureSkipVerify:    tt.skipHostnameCheck,
+		VerifyPeerCertificate: tt.verifyCertificateChain,
 	}
 	tc := tls.Client(tt, tlsConfig)
 	err = tc.Handshake()
@@ -250,4 +255,29 @@ func (tt *TLS) SetReadDeadline(t time.Time) error {
 
 func (tt *TLS) SetWriteDeadline(t time.Time) error {
 	return tt.Tunnel.SetWriteDeadline(t)
+}
+
+func (tt *TLS) verifyCertificateChain(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	certs := make([]*x509.Certificate, len(rawCerts))
+	for i, asn1Data := range rawCerts {
+		cert, err := x509.ParseCertificate(asn1Data)
+		if err != nil {
+			return errors.New("verifyCertificateChain: failed to parse certificate from client: " + err.Error())
+		}
+		certs[i] = cert
+	}
+
+	opts := x509.VerifyOptions{
+		Roots:         tt.rootCAs,
+		Intermediates: x509.NewCertPool(),
+	}
+
+	for i, cert := range certs {
+		if i == 0 {
+			continue
+		}
+		opts.Intermediates.AddCert(cert)
+	}
+	_, err := certs[0].Verify(opts)
+	return err
 }

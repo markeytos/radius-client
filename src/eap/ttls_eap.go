@@ -15,8 +15,8 @@ type TtlsEAP struct {
 	*TTLS
 }
 
-func CreateTtlsEAP(session *Session, caCert, tlsVersion string) (*TtlsEAP, error) {
-	ttls, err := CreateTTLS(session, caCert, tlsVersion)
+func CreateTtlsEAP(session *Session, caCert, tlsVersion, serverName string, tlsSkipHostnameCheck bool) (*TtlsEAP, error) {
+	ttls, err := CreateTTLS(session, caCert, tlsVersion, serverName, tlsSkipHostnameCheck)
 	return &TtlsEAP{ttls}, err
 }
 

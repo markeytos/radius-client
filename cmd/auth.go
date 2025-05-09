@@ -53,15 +53,16 @@ var (
 )
 
 var (
-	macAddress          string
-	username            string
-	password            string
-	anonymousUsername   string
-	clientCertificate   string
-	caCertificate       string
-	tunnelCACertificate string
-	tlsVersion          string
-	eapSendStart        bool
+	macAddress           string
+	username             string
+	password             string
+	anonymousUsername    string
+	clientCertificate    string
+	caCertificate        string
+	tunnelCACertificate  string
+	tlsVersion           string
+	eapSendStart         bool
+	tlsSkipHostnameCheck bool
 )
 
 var authCmd = &cobra.Command{
@@ -77,8 +78,9 @@ var authUdpCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(3),
 	PreRunE: prerun,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return auth(func() (*radius.AuthenticationSession, error) {
-			return newUDPAuthSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
+		return auth(func() (*radius.AuthenticationSession, string, error) {
+			session, err := newUDPAuthSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
+			return session, args[0], err
 		}, args[2])
 	},
 }
@@ -89,8 +91,9 @@ var authTlsCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(4),
 	PreRunE: prerun,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return auth(func() (*radius.AuthenticationSession, error) {
-			return newTLSAuthSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
+		return auth(func() (*radius.AuthenticationSession, string, error) {
+			session, err := newTLSAuthSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
+			return session, args[0], err
 		}, args[3])
 	},
 }
@@ -105,14 +108,15 @@ func init() {
 	authCmd.PersistentFlags().StringVar(&tunnelCACertificate, "tunnel-ca-cert", "", "tunnel CA certificate")
 	authCmd.PersistentFlags().StringVar(&tlsVersion, "tls-version", "1.2", "TLS version underlying TLS-based protocols")
 	authCmd.PersistentFlags().BoolVar(&eapSendStart, "eap-send-start", false, "EAP send EAP-Start")
+	authCmd.PersistentFlags().BoolVar(&tlsSkipHostnameCheck, "tls-skip-hostname-check", false, "TLS skip Hostname check in handshake")
 
 	authCmd.MarkFlagsRequiredTogether("username", "password")
 
 	authCmd.AddCommand(authUdpCmd, authTlsCmd)
 }
 
-func auth(f func() (*radius.AuthenticationSession, error), protocol string) error {
-	session, err := f()
+func auth(f func() (*radius.AuthenticationSession, string, error), protocol string) error {
+	session, serverName, err := f()
 	if err != nil {
 		slog.Error("failed to create session",
 			"command", "auth",
@@ -131,7 +135,7 @@ func auth(f func() (*radius.AuthenticationSession, error), protocol string) erro
 			)
 		}
 	}()
-	err = internalAuth(session, protocol)
+	err = internalAuth(session, serverName, protocol)
 	if err != nil {
 		slog.Error("failed authentication",
 			"network", session.RemoteAddr().Network(),
@@ -151,7 +155,7 @@ func auth(f func() (*radius.AuthenticationSession, error), protocol string) erro
 	return nil
 }
 
-func internalAuth(session *radius.AuthenticationSession, protocol string) error {
+func internalAuth(session *radius.AuthenticationSession, serverName, protocol string) error {
 	switch protocol {
 	case authMAB:
 		return session.MAB(macAddress)
@@ -172,51 +176,51 @@ func internalAuth(session *radius.AuthenticationSession, protocol string) error 
 	// nolint:errcheck // function does not return error
 	defer eaptunnel.Close()
 	eapsession := eap.NewSession(eaptunnel, anonymousUsername, eapSendStart)
-	err := eapAuth(eapsession, protocol)
+	err := eapAuth(eapsession, serverName, protocol)
 	if err != nil {
 		return err
 	}
 	return session.VerifyEAP(eapsession.RecvKey, eapsession.SendKey)
 }
 
-func eapAuth(session *eap.Session, protocol string) error {
+func eapAuth(session *eap.Session, serverName, protocol string) error {
 	switch protocol {
 	case authMabEapMd5:
 		return session.MD5(macAddress)
 	case authEapMsCHAPv2:
 		return session.MsCHAPv2(username, password)
 	case authEapTLS:
-		eaptls, err := eap.CreateTLS(session, caCertificate, tlsVersion)
+		eaptls, err := eap.CreateTLS(session, caCertificate, tlsVersion, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}
 		return eaptls.Authenticate(clientCertificate)
 	case authEapTtlsPAP:
-		eapttls, err := eap.CreateTTLS(session, tunnelCACertificate, tlsVersion)
+		eapttls, err := eap.CreateTTLS(session, tunnelCACertificate, tlsVersion, serverName, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}
 		return eapttls.PAP(username, password)
 	case authEapTtlsEapMsCHAPv2:
-		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion)
+		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}
 		ts := eap.NewSession(eapttls, anonymousUsername, false)
 		return ts.MsCHAPv2(username, password)
 	case authEapTtlsEapTLS:
-		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion)
+		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}
 		ts := eap.NewSession(eapttls, anonymousUsername, false)
-		eaptls, err := eap.CreateTLS(ts, caCertificate, tlsVersion)
+		eaptls, err := eap.CreateTLS(ts, caCertificate, tlsVersion, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}
 		return eaptls.Authenticate(clientCertificate)
 	case authPeapMsCHAPv2:
-		peap, err := eap.CreatePEAP(session, tunnelCACertificate, tlsVersion)
+		peap, err := eap.CreatePEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}
