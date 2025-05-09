@@ -90,7 +90,7 @@ Each entry must be of the format
 }
 
 func parseAttributes(attrs []string) (radius.AttributeMap, error) {
-	r := regexp.MustCompile(`^(?P<Label>[A-Za-z0-9_-]+):(?P<Value>[\ A-Za-z0-9_-]+)$`)
+	r := regexp.MustCompile(`^(?P<Label>[A-Za-z0-9_-]+):(?P<Value>[\ \.A-Za-z0-9_-]+)$`)
 
 	attrMap := make(radius.AttributeMap)
 
