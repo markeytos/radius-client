@@ -71,9 +71,9 @@ func newUDPAuthSession(address, sharedSecret string, mtuSize int, sendattrs, rec
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
 	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok {
-		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
-	sendattrs[radius.AttributeTypeFramedMtu] = strconv.Itoa(mtuSize)
+	sendattrs[radius.AttributeTypeFramedMtu] = []string{strconv.Itoa(mtuSize)}
 	return radius.NewAuthenticationSession(conn, sharedSecret, to, udpRetries, mtuSize, sendattrs, recvattrs)
 }
 
@@ -87,9 +87,9 @@ func newUDPAcctSession(address, sharedSecret string, mtuSize int, sendattrs, rec
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
 	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok {
-		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
-	sendattrs[radius.AttributeTypeFramedMtu] = strconv.Itoa(mtuSize)
+	sendattrs[radius.AttributeTypeFramedMtu] = []string{strconv.Itoa(mtuSize)}
 	return radius.NewAccountingSession(conn, sharedSecret, to, udpRetries, mtuSize, sendattrs, recvattrs)
 }
 
@@ -103,7 +103,7 @@ func newTLSAuthSession(address, serverCA, clientCer string, sendattrs, recvattrs
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
 	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok {
-		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
 	return radius.NewAuthenticationSession(conn, "radsec", to, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
 }
@@ -118,7 +118,7 @@ func newTLSAcctSession(address, serverCA, clientCer string, sendattrs, recvattrs
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
 	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok {
-		sendattrs[radius.AttributeTypeNasIdentifier] = "radius-client"
+		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
 	return radius.NewAccountingSession(conn, "radsec", to, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
 }
