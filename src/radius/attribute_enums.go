@@ -123,11 +123,6 @@ const (
 )
 
 func ParseAttributeEnumServiceType(v string) (AttributeEnumServiceType, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumServiceType(i), nil
-	}
-
 	switch v {
 	case "Login":
 		return AttributeEnumServiceTypeLogin, nil
@@ -152,6 +147,10 @@ func ParseAttributeEnumServiceType(v string) (AttributeEnumServiceType, error) {
 	case "Callback Administrative":
 		return AttributeEnumServiceTypeCallbackAdministrative, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumServiceType(i), nil
+		}
 		return 0, fmt.Errorf("invalid service type value: %s", v)
 	}
 }
@@ -168,11 +167,6 @@ const (
 )
 
 func ParseAttributeEnumFramedProtocol(v string) (AttributeEnumFramedProtocol, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumFramedProtocol(i), nil
-	}
-
 	switch v {
 	case "PPP":
 		return AttributeEnumFramedProtocolPPP, nil
@@ -187,6 +181,10 @@ func ParseAttributeEnumFramedProtocol(v string) (AttributeEnumFramedProtocol, er
 	case "X.75 Synchronous":
 		return AttributeEnumFramedProtocolX75Synchronous, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumFramedProtocol(i), nil
+		}
 		return 0, fmt.Errorf("invalid framed protocol value: %s", v)
 	}
 }
@@ -201,11 +199,6 @@ const (
 )
 
 func ParseAttributeEnumFramedRouting(v string) (AttributeEnumFramedRouting, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumFramedRouting(i), nil
-	}
-
 	switch v {
 	case "None":
 		return AttributeEnumFramedRoutingNone, nil
@@ -216,6 +209,10 @@ func ParseAttributeEnumFramedRouting(v string) (AttributeEnumFramedRouting, erro
 	case "SendListen":
 		return AttributeEnumFramedRoutingSendListen, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumFramedRouting(i), nil
+		}
 		return 0, fmt.Errorf("invalid framed routing value: %s", v)
 	}
 }
@@ -230,11 +227,6 @@ const (
 )
 
 func ParseAttributeEnumFramedCompression(v string) (AttributeEnumFramedCompression, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumFramedCompression(i), nil
-	}
-
 	switch v {
 	case "None":
 		return AttributeEnumFramedCompressionNone, nil
@@ -245,6 +237,10 @@ func ParseAttributeEnumFramedCompression(v string) (AttributeEnumFramedCompressi
 	case "Stac-LZS compression":
 		return AttributeEnumFramedCompressionStacLZSCompression, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumFramedCompression(i), nil
+		}
 		return 0, fmt.Errorf("invalid framed compression value: %s", v)
 	}
 }
@@ -262,11 +258,6 @@ const (
 )
 
 func ParseAttributeEnumLoginService(v string) (AttributeEnumLoginService, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumLoginService(i), nil
-	}
-
 	switch v {
 	case "Telnet":
 		return AttributeEnumLoginServiceTelnet, nil
@@ -283,6 +274,10 @@ func ParseAttributeEnumLoginService(v string) (AttributeEnumLoginService, error)
 	case "X25-T3POS":
 		return AttributeEnumLoginServiceX25T3POS, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumLoginService(i), nil
+		}
 		return 0, fmt.Errorf("invalid login service value: %s", v)
 	}
 }
@@ -295,17 +290,16 @@ const (
 )
 
 func ParseAttributeEnumTerminationAction(v string) (AttributeEnumTerminationAction, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumTerminationAction(i), nil
-	}
-
 	switch v {
 	case "Default":
 		return AttributeEnumTerminationActionDefault, nil
 	case "RADIUS-Request":
 		return AttributeEnumTerminationActionRadiusRequest, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumTerminationAction(i), nil
+		}
 		return 0, fmt.Errorf("invalid termination action value: %s", v)
 	}
 }
@@ -331,11 +325,6 @@ const (
 )
 
 func ParseAttributeEnumErrorCause(v string) (AttributeEnumErrorCause, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumErrorCause(i), nil
-	}
-
 	switch v {
 	case "Residual Session Context Removed":
 		return AttributeEnumErrorCauseResidualSessionContextRemoved, nil
@@ -368,6 +357,10 @@ func ParseAttributeEnumErrorCause(v string) (AttributeEnumErrorCause, error) {
 	case "Request Initiated":
 		return AttributeEnumErrorCauseRequestInitiated, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumErrorCause(i), nil
+		}
 		return 0, fmt.Errorf("invalid error cause value: %s", v)
 	}
 }
@@ -383,11 +376,6 @@ const (
 )
 
 func ParseAttributeEnumAcctStatusType(v string) (AttributeEnumAcctStatusType, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumAcctStatusType(i), nil
-	}
-
 	switch v {
 	case "Start":
 		return AttributeEnumAcctStatusTypeStart, nil
@@ -400,6 +388,10 @@ func ParseAttributeEnumAcctStatusType(v string) (AttributeEnumAcctStatusType, er
 	case "Accounting-Off":
 		return AttributeEnumAcctStatusTypeAccountingOff, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumAcctStatusType(i), nil
+		}
 		return 0, fmt.Errorf("invalid accounting status type value: %s", v)
 	}
 }
@@ -413,11 +405,6 @@ const (
 )
 
 func ParseAttributeEnumAcctAuthentic(v string) (AttributeEnumAcctAuthentic, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumAcctAuthentic(i), nil
-	}
-
 	switch v {
 	case "RADIUS":
 		return AttributeEnumAcctAuthenticRadius, nil
@@ -426,6 +413,10 @@ func ParseAttributeEnumAcctAuthentic(v string) (AttributeEnumAcctAuthentic, erro
 	case "Remote":
 		return AttributeEnumAcctAuthenticRemote, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumAcctAuthentic(i), nil
+		}
 		return 0, fmt.Errorf("invalid accounting authentic value: %s", v)
 	}
 }
@@ -454,11 +445,6 @@ const (
 )
 
 func ParseAttributeEnumAcctTerminateCause(v string) (AttributeEnumAcctTerminateCause, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumAcctTerminateCause(i), nil
-	}
-
 	switch v {
 	case "User Request":
 		return AttributeEnumAcctTerminateCauseUserRequest, nil
@@ -495,6 +481,10 @@ func ParseAttributeEnumAcctTerminateCause(v string) (AttributeEnumAcctTerminateC
 	case "Host Request":
 		return AttributeEnumAcctTerminateCauseHostRequest, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumAcctTerminateCause(i), nil
+		}
 		return 0, fmt.Errorf("invalid accounting terminate cause value: %s", v)
 	}
 }
@@ -525,11 +515,6 @@ const (
 )
 
 func ParseAttributeEnumNasPortType(v string) (AttributeEnumNasPortType, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumNasPortType(i), nil
-	}
-
 	switch v {
 	case "Async":
 		return AttributeEnumNasPortTypeAsync, nil
@@ -572,6 +557,10 @@ func ParseAttributeEnumNasPortType(v string) (AttributeEnumNasPortType, error) {
 	case "Wireless - IEEE 802.11":
 		return AttributeEnumNasPortTypeWirelessIEEE80211, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumNasPortType(i), nil
+		}
 		return 0, fmt.Errorf("invalid NAS port type value: %s", v)
 	}
 }
@@ -595,11 +584,6 @@ const (
 )
 
 func ParseAttributeEnumTunnelType(v string) (AttributeEnumTunnelType, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumTunnelType(i), nil
-	}
-
 	switch v {
 	case "PointToPointTunnelingProtocol":
 		return AttributeEnumTunnelTypePointToPointTunnelingProtocol, nil
@@ -626,6 +610,10 @@ func ParseAttributeEnumTunnelType(v string) (AttributeEnumTunnelType, error) {
 	case "Virtual LAN":
 		return AttributeEnumTunnelTypeVirtualLAN, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumTunnelType(i), nil
+		}
 		return 0, fmt.Errorf("invalid tunnel type value: %s", v)
 	}
 }
@@ -651,11 +639,6 @@ const (
 )
 
 func ParseAttributeEnumTunnelMediumType(v string) (AttributeEnumTunnelMediumType, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumTunnelMediumType(i), nil
-	}
-
 	switch v {
 	case "IPv4":
 		return AttributeEnumTunnelMediumTypeIPv4, nil
@@ -688,6 +671,10 @@ func ParseAttributeEnumTunnelMediumType(v string) (AttributeEnumTunnelMediumType
 	case "E.164 with NSAP subaddress":
 		return AttributeEnumTunnelMediumTypeE164WithNSAPSubaddress, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumTunnelMediumType(i), nil
+		}
 		return 0, fmt.Errorf("invalid tunnel medium type value: %s", v)
 	}
 }
@@ -700,17 +687,16 @@ const (
 )
 
 func ParseAttributeEnumIngressFilters(v string) (AttributeEnumIngressFilters, error) {
-	i, err := strconv.ParseUint(v, 10, 0)
-	if err == nil {
-		return AttributeEnumIngressFilters(i), nil
-	}
-
 	switch v {
 	case "Enabled":
 		return AttributeEnumIngressFiltersEnabled, nil
 	case "Disabled":
 		return AttributeEnumIngressFiltersDisabled, nil
 	default:
+		i, err := strconv.ParseUint(v, 10, 0)
+		if err == nil {
+			return AttributeEnumIngressFilters(i), nil
+		}
 		return 0, fmt.Errorf("invalid ingress filter value: %s", v)
 	}
 }

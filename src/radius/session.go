@@ -160,10 +160,12 @@ func (s *session) lastReadDatagramHasExpectedAttributes() error {
 		matched := false
 		for _, attr := range s.lastReadDatagram.Attributes {
 			if expected.Type == attr.Type && subtle.ConstantTimeCompare(expected.Value, attr.Value) == 1 {
+				fmt.Printf("G %x\n", expected.Value)
 				matched = true
 			}
 		}
 		if !matched {
+			fmt.Printf("B %x\n", expected.Value)
 			expectedAttrs = append(expectedAttrs, expected.Type.String())
 		}
 	}
@@ -182,7 +184,7 @@ func validResponseAndMessageAuthenticator(d *Datagram, reqauth [16]byte, secret 
 			return false
 		}
 		old := make([]byte, md5.Size)
-		for i := 0; i < md5.Size; i++ {
+		for i := range md5.Size {
 			old[i] = ma.Value[i]
 			ma.Value[i] = 0
 		}
