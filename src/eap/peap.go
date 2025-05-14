@@ -17,17 +17,19 @@ type PEAP struct {
 	client *tls.Conn
 }
 
-func CreatePEAP(session *Session, caCert, tlsVersion string) (*PEAP, error) {
-	t, err := internalCreateTLS(session, caCert, tlsVersion, TypePEAP)
+func CreatePEAP(session *Session, caCert, tlsVersion, serverName string, tlsSkipHostnameCheck bool) (*PEAP, error) {
+	t, err := internalCreateTLS(session, caCert, tlsVersion, tlsSkipHostnameCheck, TypePEAP)
 	if err != nil {
 		return nil, err
 	}
 	tlsConfig := &tls.Config{
 		RootCAs:                t.rootCAs,
-		InsecureSkipVerify:     true,
 		MinVersion:             t.tlsVersion,
 		MaxVersion:             t.tlsVersion,
 		SessionTicketsDisabled: true,
+		InsecureSkipVerify:     tlsSkipHostnameCheck,
+		ServerName:             serverName,
+		VerifyPeerCertificate:  t.verifyCertificateChain,
 	}
 	return &PEAP{TLS: t, client: tls.Client(t, tlsConfig)}, nil
 }
