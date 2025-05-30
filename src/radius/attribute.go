@@ -25,7 +25,7 @@ const (
 	maxAttributeLen = 255 - 2
 )
 
-type AttributeMap map[AttributeType]string
+type AttributeMap map[AttributeType][]string
 
 type Attribute struct {
 	Type  AttributeType
@@ -96,101 +96,103 @@ func writeMessageAuthenticator(d *Datagram, ma *Attribute, secret string) error 
 
 func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 	attrs := make([]*Attribute, 0, len(attrMap))
-	for t, v := range attrMap {
-		switch t {
-		case AttributeTypeUserName,
-			AttributeTypeFilterId,
-			AttributeTypeReplyMessage,
-			AttributeTypeCallbackNumber,
-			AttributeTypeCallbackId,
-			AttributeTypeFramedRoute,
-			AttributeTypeCalledStationId,
-			AttributeTypeCallingStationId,
-			AttributeTypeNasIdentifier,
-			AttributeTypeLoginLatService,
-			AttributeTypeLoginLatNode,
-			AttributeTypeAcctSessionId,
-			AttributeTypeAcctMultiSessionId,
-			AttributeTypeLoginLatPort,
-			AttributeTypeTunnelPrivateGroupId,
-			AttributeTypeEgressVlanName:
-			attrs = append(attrs, newAttribute(t, []byte(v)))
-		case AttributeTypeState,
-			AttributeTypeClass,
-			AttributeTypeProxyState,
-			AttributeTypeEapMessage,
-			AttributeTypeLoginLatGroup,
-			AttributeTypeFramedAppleTalkZone,
-			AttributeTypeUserPriorityTable:
-			a := newEmptyAttribute(t, len(v)/2)
-			_, err := hex.Decode(a.Value, []byte(v))
-			if err != nil {
-				return attrs, fmt.Errorf("invalid hex string: %w", err)
+	for t, vs := range attrMap {
+		for _, v := range vs {
+			switch t {
+			case AttributeTypeUserName,
+				AttributeTypeFilterId,
+				AttributeTypeReplyMessage,
+				AttributeTypeCallbackNumber,
+				AttributeTypeCallbackId,
+				AttributeTypeFramedRoute,
+				AttributeTypeCalledStationId,
+				AttributeTypeCallingStationId,
+				AttributeTypeNasIdentifier,
+				AttributeTypeLoginLatService,
+				AttributeTypeLoginLatNode,
+				AttributeTypeAcctSessionId,
+				AttributeTypeAcctMultiSessionId,
+				AttributeTypeLoginLatPort,
+				AttributeTypeTunnelPrivateGroupId,
+				AttributeTypeEgressVlanName:
+				attrs = append(attrs, newAttribute(t, []byte(v)))
+			case AttributeTypeState,
+				AttributeTypeClass,
+				AttributeTypeProxyState,
+				AttributeTypeEapMessage,
+				AttributeTypeLoginLatGroup,
+				AttributeTypeFramedAppleTalkZone,
+				AttributeTypeUserPriorityTable:
+				a := newEmptyAttribute(t, len(v)/2)
+				_, err := hex.Decode(a.Value, []byte(v))
+				if err != nil {
+					return attrs, fmt.Errorf("invalid hex string: %w", err)
+				}
+				attrs = append(attrs, a)
+			case AttributeTypeMessageAuthenticator:
+				attrs = append(attrs, newEmptyMessageAuthenticator())
+			case AttributeTypeNasIpAddress,
+				AttributeTypeFramedIpAddress,
+				AttributeTypeFramedIpNetmask,
+				AttributeTypeLoginIpHost:
+				ip := net.ParseIP(v)
+				ip = ip.To4()
+				if ip == nil {
+					return attrs, fmt.Errorf("invalid IPv4 address: %s", v)
+				}
+				attrs = append(attrs, newAttribute(t, ip))
+			case AttributeTypeNasPort,
+				AttributeTypeFramedMtu,
+				AttributeTypeLoginTcpPort,
+				AttributeTypeFramedIpxNetwork,
+				AttributeTypeSessionTimeout,
+				AttributeTypeIdleTimeout,
+				AttributeTypeFramedAppleTalkLink,
+				AttributeTypeFramedAppleTalkNetwork,
+				AttributeTypeAcctDelayTime,
+				AttributeTypeAcctInputOctets,
+				AttributeTypeAcctOutputOctets,
+				AttributeTypeAcctSessionTime,
+				AttributeTypeAcctInputPackets,
+				AttributeTypeAcctOutputPackets,
+				AttributeTypeAcctLinkCount,
+				AttributeTypePortLimit:
+				i, err := strconv.ParseUint(v, 10, 0)
+				if err != nil {
+					return attrs, err
+				}
+				a := newEmptyAttribute(t, 4)
+				binary.BigEndian.PutUint32(a.Value, uint32(i))
+				attrs = append(attrs, a)
+			case AttributeTypeServiceType,
+				AttributeTypeFramedProtocol,
+				AttributeTypeFramedRouting,
+				AttributeTypeFramedCompression,
+				AttributeTypeLoginService,
+				AttributeTypeTerminationAction,
+				AttributeTypeErrorCause,
+				AttributeTypeAcctStatusType,
+				AttributeTypeAcctAuthentic,
+				AttributeTypeAcctTerminateCause,
+				AttributeTypeNasPortType,
+				AttributeTypeTunnelType,
+				AttributeTypeTunnelMediumType,
+				AttributeTypeIngressFilters:
+				a := newEmptyAttribute(t, 4)
+				err := ParseAttributeEnumData(a.Value, t, v)
+				if err != nil {
+					return attrs, err
+				}
+				attrs = append(attrs, a)
+			case AttributeTypeVendorSpecific:
+				return attrs, fmt.Errorf("TODO: VSA not implemented yet")
+			case AttributeTypeEgressVlanId:
+				return attrs, fmt.Errorf("TODO: egress VLAN ID not implemented yet")
+			case AttributeTypeUserPassword:
+				return attrs, fmt.Errorf("use other constructors for encrypted attributes")
+			default:
+				return attrs, fmt.Errorf("unimplemented attribute: %s", t.String())
 			}
-			attrs = append(attrs, a)
-		case AttributeTypeMessageAuthenticator:
-			attrs = append(attrs, newEmptyMessageAuthenticator())
-		case AttributeTypeNasIpAddress,
-			AttributeTypeFramedIpAddress,
-			AttributeTypeFramedIpNetmask,
-			AttributeTypeLoginIpHost:
-			ip := net.ParseIP(v)
-			ip = ip.To4()
-			if ip == nil {
-				return attrs, fmt.Errorf("invalid IPv4 address: %s", v)
-			}
-			attrs = append(attrs, newAttribute(t, ip))
-		case AttributeTypeNasPort,
-			AttributeTypeFramedMtu,
-			AttributeTypeLoginTcpPort,
-			AttributeTypeFramedIpxNetwork,
-			AttributeTypeSessionTimeout,
-			AttributeTypeIdleTimeout,
-			AttributeTypeFramedAppleTalkLink,
-			AttributeTypeFramedAppleTalkNetwork,
-			AttributeTypeAcctDelayTime,
-			AttributeTypeAcctInputOctets,
-			AttributeTypeAcctOutputOctets,
-			AttributeTypeAcctSessionTime,
-			AttributeTypeAcctInputPackets,
-			AttributeTypeAcctOutputPackets,
-			AttributeTypeAcctLinkCount,
-			AttributeTypePortLimit:
-			i, err := strconv.ParseUint(v, 10, 0)
-			if err != nil {
-				return attrs, err
-			}
-			a := newEmptyAttribute(t, 4)
-			binary.BigEndian.PutUint32(a.Value, uint32(i))
-			attrs = append(attrs, a)
-		case AttributeTypeServiceType,
-			AttributeTypeFramedProtocol,
-			AttributeTypeFramedRouting,
-			AttributeTypeFramedCompression,
-			AttributeTypeLoginService,
-			AttributeTypeTerminationAction,
-			AttributeTypeErrorCause,
-			AttributeTypeAcctStatusType,
-			AttributeTypeAcctAuthentic,
-			AttributeTypeAcctTerminateCause,
-			AttributeTypeNasPortType,
-			AttributeTypeTunnelType,
-			AttributeTypeTunnelMediumType,
-			AttributeTypeIngressFilters:
-			a := newEmptyAttribute(t, 4)
-			err := ParseAttributeEnumData(a.Value, t, v)
-			if err != nil {
-				return attrs, err
-			}
-			attrs = append(attrs, a)
-		case AttributeTypeVendorSpecific:
-			return attrs, fmt.Errorf("TODO: VSA not implemented yet")
-		case AttributeTypeEgressVlanId:
-			return attrs, fmt.Errorf("TODO: egress VLAN ID not implemented yet")
-		case AttributeTypeUserPassword:
-			return attrs, fmt.Errorf("use other constructors for encrypted attributes")
-		default:
-			return attrs, fmt.Errorf("unimplemented attribute: %s", t.String())
 		}
 	}
 	return attrs, nil

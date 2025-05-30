@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 
 	"github.com/markeytos/radius-client/src/radius"
 	"github.com/spf13/cobra"
@@ -104,10 +105,11 @@ func parseAttributes(attrs []string) (radius.AttributeMap, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid attribute label: %w", err)
 		}
-		if _, ok := attrMap[at]; ok {
-			return nil, fmt.Errorf("duplicate attribute: %s", a)
+		val := submatch[r.SubexpIndex("Value")]
+		if slices.Contains(attrMap[at], val) {
+			return nil, fmt.Errorf("duplicate attribute value: %s, %s", a, val)
 		}
-		attrMap[at] = submatch[r.SubexpIndex("Value")]
+		attrMap[at] = append(attrMap[at], val)
 	}
 
 	return attrMap, nil
