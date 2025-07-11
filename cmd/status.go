@@ -21,8 +21,10 @@ var statusUdpAuthCmd = &cobra.Command{
 	Short: "Send status to RADIUS/UDP authentication port",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return status(func() (statusSession, error) {
-			return newUDPAuthSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
+		return retry(func() error {
+			return status(func() (statusSession, error) {
+				return newUDPAuthSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
+			})
 		})
 	},
 }
@@ -32,8 +34,10 @@ var statusUdpAcctCmd = &cobra.Command{
 	Short: "Send status to RADIUS/UDP accounting port",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return status(func() (statusSession, error) {
-			return newUDPAcctSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
+		return retry(func() error {
+			return status(func() (statusSession, error) {
+				return newUDPAcctSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
+			})
 		})
 	},
 }
@@ -43,8 +47,10 @@ var statusTlsCmd = &cobra.Command{
 	Short: "Send status to RADIUS/TLS port",
 	Args:  cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return status(func() (statusSession, error) {
-			return newTLSAuthSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
+		return retry(func() error {
+			return status(func() (statusSession, error) {
+				return newTLSAuthSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
+			})
 		})
 	},
 }

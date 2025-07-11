@@ -22,8 +22,10 @@ var acctUdpCmd = &cobra.Command{
 	Short: "RADIUS/UDP client accounting",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return acct(func() (*radius.AccountingSession, error) {
-			return newUDPAcctSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
+		return retry(func() error {
+			return acct(func() (*radius.AccountingSession, error) {
+				return newUDPAcctSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
+			})
 		})
 	},
 }
@@ -33,8 +35,10 @@ var acctTlsCmd = &cobra.Command{
 	Short: "RADIUS/TLS client accounting",
 	Args:  cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return acct(func() (*radius.AccountingSession, error) {
-			return newTLSAcctSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
+		return retry(func() error {
+			return acct(func() (*radius.AccountingSession, error) {
+				return newTLSAcctSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
+			})
 		})
 	},
 }
