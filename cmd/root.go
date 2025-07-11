@@ -8,20 +8,24 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"time"
 
 	"github.com/markeytos/radius-client/src/radius"
 	"github.com/spf13/cobra"
 )
 
 var (
-	udpAuthPort  int
-	udpAcctPort  int
-	udpRetries   int
-	udpMTUSize   int
-	udpTimeout   string
-	tcpPort      int
-	tlsTimeout   string
-	radsecUnsafe bool
+	retries          int
+	retryIntervalStr string
+	retryInterval    time.Duration
+	udpAuthPort      int
+	udpAcctPort      int
+	udpRetries       int
+	udpMTUSize       int
+	udpTimeout       string
+	tcpPort          int
+	tlsTimeout       string
+	radsecUnsafe     bool
 )
 
 // Attribute variables, each string should be of the format `<label>:<value>[:<type>]`
@@ -57,6 +61,13 @@ for most common authentication protocol.`,
 		if err != nil {
 			return fmt.Errorf("invalid attribute to receive: %w", err)
 		}
+		if retries < 0 {
+			return fmt.Errorf("number of retries must be 0 or positive")
+		}
+		retryInterval, err = time.ParseDuration(retryIntervalStr)
+		if err != nil {
+			return fmt.Errorf("invalid retry interval: %w", err)
+		}
 
 		return nil
 	},
@@ -70,6 +81,8 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().IntVarP(&retries, "retries", "r", 0, "Number of retries if the command fails")
+	rootCmd.PersistentFlags().StringVarP(&retryIntervalStr, "retry-interval", "I", "0s", "Time between each retry")
 	rootCmd.PersistentFlags().IntVar(&udpAuthPort, "udp-auth-port", radius.UDPAuthenticationPort, "RADIUS/UDP authentication port")
 	rootCmd.PersistentFlags().IntVar(&udpAcctPort, "udp-acct-port", radius.UDPAccountingPort, "RADIUS/UDP accounting port")
 	rootCmd.PersistentFlags().IntVar(&udpRetries, "udp-retries", 2, "RADIUS/UDP packet send retries")
