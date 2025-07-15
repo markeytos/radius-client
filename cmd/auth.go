@@ -78,10 +78,12 @@ var authUdpCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(3),
 	PreRunE: prerun,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return auth(func() (*radius.AuthenticationSession, string, error) {
-			session, err := newUDPAuthSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
-			return session, args[0], err
-		}, args[2])
+		return retry(func() error {
+			return auth(func() (*radius.AuthenticationSession, string, error) {
+				session, err := newUDPAuthSession(args[0], args[1], udpMTUSize, sendAttributes, receiveAttributes)
+				return session, args[0], err
+			}, args[2])
+		})
 	},
 }
 
@@ -91,10 +93,12 @@ var authTlsCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(4),
 	PreRunE: prerun,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return auth(func() (*radius.AuthenticationSession, string, error) {
-			session, err := newTLSAuthSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
-			return session, args[0], err
-		}, args[3])
+		return retry(func() error {
+			return auth(func() (*radius.AuthenticationSession, string, error) {
+				session, err := newTLSAuthSession(args[0], args[1], args[2], sendAttributes, receiveAttributes)
+				return session, args[0], err
+			}, args[3])
+		})
 	},
 }
 
