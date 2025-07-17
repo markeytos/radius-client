@@ -18,8 +18,8 @@ type AuthenticationSession struct {
 	session
 }
 
-func NewAuthenticationSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*AuthenticationSession, error) {
-	session, err := newSession(conn, ss, timeout, retries, mtuSize, sendattrsMap, recvattrsMap)
+func NewAuthenticationSession(conn net.Conn, ss string, timeout, maxWriteJitter time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*AuthenticationSession, error) {
+	session, err := newSession(conn, ss, timeout, maxWriteJitter, retries, mtuSize, sendattrsMap, recvattrsMap)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (s *AuthenticationSession) sessionKeyEqual(key, reqauth, salt, enckey []byt
 		h.Write(ss)
 		h.Write(enc[i-16 : i])
 		enc = h.Sum(enc)
-		for j := 0; j < 16; j++ {
+		for j := range 16 {
 			enc[i+j] ^= keystr[i+j]
 		}
 	}

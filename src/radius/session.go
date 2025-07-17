@@ -22,6 +22,7 @@ type session struct {
 	identifier          uint8
 	sharedSecret        string
 	timeout             time.Duration
+	maxWriteJitter      time.Duration
 	retries             int
 	mtuSize             int
 	sendAttributes      Attributes
@@ -31,7 +32,7 @@ type session struct {
 	lastWrittenDatagram *Datagram
 }
 
-func newSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*session, error) {
+func newSession(conn net.Conn, ss string, timeout, maxWriteJitter time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*session, error) {
 	sendattrs, err := serializeAttributeMap(sendattrsMap)
 	if err != nil {
 		return nil, err
@@ -45,6 +46,7 @@ func newSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSiz
 		identifier:     randUint8(),
 		sharedSecret:   ss,
 		timeout:        timeout,
+		maxWriteJitter: maxWriteJitter,
 		retries:        retries,
 		mtuSize:        mtuSize,
 		sendAttributes: sendattrs,
@@ -91,6 +93,7 @@ func (s *session) newDatagram(h *Header, attrs ...*Attribute) (*Datagram, error)
 }
 
 func (s *session) WriteDatagram(wd *Datagram) (int, error) {
+	time.Sleep(randDuration(s.maxWriteJitter))
 	err := s.SetWriteDeadline(time.Now().Add(s.timeout))
 	if err != nil {
 		return 0, fmt.Errorf("error setting send deadline: %w", err)
@@ -233,6 +236,17 @@ func validResponseAndMessageAuthenticator(d *Datagram, reqauth [16]byte, secret 
 // 	copy(ma.Value, sum)
 // 	return subtle.ConstantTimeCompare(sum, old) == 1
 // }
+
+func randDuration(max time.Duration) time.Duration {
+	if max == 0 {
+		return 0
+	}
+	id, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+	if err != nil {
+		panic(err)
+	}
+	return time.Duration(id.Int64())
+}
 
 func randUint8() uint8 {
 	id, err := rand.Int(rand.Reader, big.NewInt(256))

@@ -16,8 +16,8 @@ type AccountingSession struct {
 	session
 }
 
-func NewAccountingSession(conn net.Conn, ss string, timeout time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*AccountingSession, error) {
-	session, err := newSession(conn, ss, timeout, retries, mtuSize, sendattrsMap, recvattrsMap)
+func NewAccountingSession(conn net.Conn, ss string, timeout, maxWriteJitter time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*AccountingSession, error) {
+	session, err := newSession(conn, ss, timeout, maxWriteJitter, retries, mtuSize, sendattrsMap, recvattrsMap)
 	if err != nil {
 		return nil, err
 	}
