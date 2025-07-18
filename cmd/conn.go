@@ -70,7 +70,7 @@ func newUDPAuthSession(address, sharedSecret string, mtuSize int, sendattrs, rec
 		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
 	sendattrs[radius.AttributeTypeFramedMtu] = []string{strconv.Itoa(mtuSize)}
-	return radius.NewAuthenticationSession(conn, sharedSecret, udpTimeout, maxWriteJitter, udpRetries, mtuSize, sendattrs, recvattrs)
+	return radius.NewAuthenticationSession(conn, sharedSecret, udpTimeout, minWriteJitter, maxWriteJitter, udpRetries, mtuSize, sendattrs, recvattrs)
 }
 
 func newUDPAcctSession(address, sharedSecret string, mtuSize int, sendattrs, recvattrs radius.AttributeMap) (*radius.AccountingSession, error) {
@@ -82,7 +82,7 @@ func newUDPAcctSession(address, sharedSecret string, mtuSize int, sendattrs, rec
 		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
 	sendattrs[radius.AttributeTypeFramedMtu] = []string{strconv.Itoa(mtuSize)}
-	return radius.NewAccountingSession(conn, sharedSecret, udpTimeout, maxWriteJitter, udpRetries, mtuSize, sendattrs, recvattrs)
+	return radius.NewAccountingSession(conn, sharedSecret, udpTimeout, minWriteJitter, maxWriteJitter, udpRetries, mtuSize, sendattrs, recvattrs)
 }
 
 func newTLSAuthSession(address, serverCA, clientCer string, sendattrs, recvattrs radius.AttributeMap) (*radius.AuthenticationSession, error) {
@@ -93,7 +93,7 @@ func newTLSAuthSession(address, serverCA, clientCer string, sendattrs, recvattrs
 	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok {
 		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
-	return radius.NewAuthenticationSession(conn, "radsec", tlsTimeout, maxWriteJitter, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
+	return radius.NewAuthenticationSession(conn, "radsec", tlsTimeout, minWriteJitter, maxWriteJitter, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
 }
 
 func newTLSAcctSession(address, serverCA, clientCer string, sendattrs, recvattrs radius.AttributeMap) (*radius.AccountingSession, error) {
@@ -104,5 +104,5 @@ func newTLSAcctSession(address, serverCA, clientCer string, sendattrs, recvattrs
 	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok {
 		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
-	return radius.NewAccountingSession(conn, "radsec", tlsTimeout, maxWriteJitter, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
+	return radius.NewAccountingSession(conn, "radsec", tlsTimeout, minWriteJitter, maxWriteJitter, 1, radius.DatagramMaxLen, sendattrs, recvattrs)
 }

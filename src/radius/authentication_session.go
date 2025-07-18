@@ -18,8 +18,8 @@ type AuthenticationSession struct {
 	session
 }
 
-func NewAuthenticationSession(conn net.Conn, ss string, timeout, maxWriteJitter time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*AuthenticationSession, error) {
-	session, err := newSession(conn, ss, timeout, maxWriteJitter, retries, mtuSize, sendattrsMap, recvattrsMap)
+func NewAuthenticationSession(conn net.Conn, ss string, timeout, minWriteJitter, maxWriteJitter time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*AuthenticationSession, error) {
+	session, err := newSession(conn, ss, timeout, minWriteJitter, maxWriteJitter, retries, mtuSize, sendattrsMap, recvattrsMap)
 	if err != nil {
 		return nil, err
 	}

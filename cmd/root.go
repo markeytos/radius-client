@@ -27,6 +27,8 @@ var (
 	tcpPort           int
 	tlsTimeoutStr     string
 	tlsTimeout        time.Duration
+	minWriteJitterStr string
+	minWriteJitter    time.Duration
 	maxWriteJitterStr string
 	maxWriteJitter    time.Duration
 	radsecUnsafe      bool
@@ -80,9 +82,16 @@ for most common authentication protocol.`,
 		if err != nil {
 			return fmt.Errorf("invalid TLS timeout: %w", err)
 		}
+		minWriteJitter, err = time.ParseDuration(minWriteJitterStr)
+		if err != nil {
+			return fmt.Errorf("invalid min write jitter: %w", err)
+		}
 		maxWriteJitter, err = time.ParseDuration(maxWriteJitterStr)
 		if err != nil {
 			return fmt.Errorf("invalid max write jitter: %w", err)
+		}
+		if minWriteJitter > maxWriteJitter {
+			return fmt.Errorf("max write jitter must be greater than min write jitter")
 		}
 
 		return nil
@@ -107,6 +116,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&tcpPort, "tcp-port", radius.RadSecTCPPort, "RADIUS/TLS (RadSec) port")
 	rootCmd.PersistentFlags().BoolVar(&radsecUnsafe, "radsec-unsafe", false, "RADIUS/TLS (RadSec) skip server authentication")
 	rootCmd.PersistentFlags().StringVar(&tlsTimeoutStr, "tls-timeout", "15s", "RADIUS/TLS connection response timeout")
+	rootCmd.PersistentFlags().StringVar(&minWriteJitterStr, "min-send-jitter", "50ms", "Min packet send time-in-between jitter")
 	rootCmd.PersistentFlags().StringVar(&maxWriteJitterStr, "max-send-jitter", "1s", "Max packet send time-in-between jitter")
 	rootCmd.PersistentFlags().StringArray("attrs-to-send", []string{}, `Additional attributes to send. Attributes will be
 overwritten if required by protocol executed. Each
