@@ -198,22 +198,22 @@ func eapAuth(session *eap.Session, serverName, protocol string) error {
 		if err != nil {
 			return err
 		}
-		return eaptls.Authenticate(clientCertificate)
+		return eaptls.Authenticate(clientCertificate, tlsAuthenticationKeyLogFilename)
 	case authEapTtlsPAP:
-		eapttls, err := eap.CreateTTLS(session, tunnelCACertificate, tlsVersion, serverName, tlsSkipHostnameCheck)
+		eapttls, err := eap.CreateTTLS(session, tunnelCACertificate, tlsVersion, serverName, tlsTunnelKeyLogFilename, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}
 		return eapttls.PAP(username, password)
 	case authEapTtlsEapMsCHAPv2:
-		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsSkipHostnameCheck)
+		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsTunnelKeyLogFilename, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}
 		ts := eap.NewSession(eapttls, anonymousUsername, false)
 		return ts.MsCHAPv2(username, password)
 	case authEapTtlsEapTLS:
-		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsSkipHostnameCheck)
+		eapttls, err := eap.CreateTtlsEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsTunnelKeyLogFilename, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}
@@ -222,9 +222,9 @@ func eapAuth(session *eap.Session, serverName, protocol string) error {
 		if err != nil {
 			return err
 		}
-		return eaptls.Authenticate(clientCertificate)
+		return eaptls.Authenticate(clientCertificate, tlsAuthenticationKeyLogFilename)
 	case authPeapMsCHAPv2:
-		peap, err := eap.CreatePEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsSkipHostnameCheck)
+		peap, err := eap.CreatePEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsTunnelKeyLogFilename, tlsSkipHostnameCheck)
 		if err != nil {
 			return err
 		}

@@ -77,7 +77,7 @@ func internalCreateTLS(session *Session, caCert, tlsVersion string, skipHostname
 	}, nil
 }
 
-func (tt *TLS) Authenticate(certpath string) error {
+func (tt *TLS) Authenticate(certpath, keyLogFilename string) error {
 	cert, err := tls.LoadX509KeyPair(certpath, certpath)
 	if err != nil {
 		return err
@@ -94,11 +94,31 @@ func (tt *TLS) Authenticate(certpath string) error {
 		MaxVersion:            tt.tlsVersion,
 		InsecureSkipVerify:    tt.skipHostnameCheck,
 		VerifyPeerCertificate: tt.verifyCertificateChain,
+		Renegotiation:         tls.RenegotiateNever,
+	}
+	if keyLogFilename != "" {
+		f, err := os.OpenFile(keyLogFilename, os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		tlsConfig.KeyLogWriter = f
 	}
 	tc := tls.Client(tt, tlsConfig)
 	err = tc.Handshake()
 	if err != nil {
 		return err
+	}
+
+	if tt.tlsVersion == tls.VersionTLS13 {
+		buff := make([]byte, 16)
+		blen, err := tc.Read(buff)
+		if err != nil {
+			return err
+		}
+		if blen != 1 || buff[0] != 0x00 {
+			return fmt.Errorf("invalid success byte for EAP-TLS")
+		}
 	}
 
 	wd := tt.newDatagram(&Content{Type: tt.packetType, Data: []byte{0}})

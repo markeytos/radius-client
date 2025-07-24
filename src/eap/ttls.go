@@ -8,7 +8,9 @@ package eap
 import (
 	"bufio"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/markeytos/radius-client/src/eap/diameter"
 )
@@ -17,10 +19,11 @@ const ttlsMasterKeyLabel = "ttls keying material"
 
 type TTLS struct {
 	*TLS
-	client *tls.Conn
+	tunnelKeyLogWriter *os.File
+	client             *tls.Conn
 }
 
-func CreateTTLS(session *Session, caCert, tlsVersion, serverName string, tlsSkipHostnameCheck bool) (*TTLS, error) {
+func CreateTTLS(session *Session, caCert, tlsVersion, serverName, tlsTunnelKeyLogFilename string, tlsSkipHostnameCheck bool) (*TTLS, error) {
 	t, err := internalCreateTLS(session, caCert, tlsVersion, tlsSkipHostnameCheck, TypeTTLS)
 	if err != nil {
 		return nil, err
@@ -34,7 +37,18 @@ func CreateTTLS(session *Session, caCert, tlsVersion, serverName string, tlsSkip
 		ServerName:             serverName,
 		VerifyPeerCertificate:  t.verifyCertificateChain,
 	}
-	return &TTLS{TLS: t, client: tls.Client(t, tlsConfig)}, nil
+	var ttls *TTLS
+	if tlsTunnelKeyLogFilename != "" {
+		f, err := os.OpenFile(tlsTunnelKeyLogFilename, os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.KeyLogWriter = f
+		ttls = &TTLS{TLS: t, tunnelKeyLogWriter: f, client: tls.Client(t, tlsConfig)}
+	} else {
+		ttls = &TTLS{TLS: t, client: tls.Client(t, tlsConfig)}
+	}
+	return ttls, nil
 }
 
 func (tt *TTLS) PAP(uname, pw string) error {
@@ -76,8 +90,9 @@ func (tt *TTLS) PAP(uname, pw string) error {
 func (tt *TTLS) Close() error {
 	var err error
 	tt.RecvKey, tt.SendKey, err = exportKeyingMaterial(tt.client, ttlsMasterKeyLabel)
-	if err != nil {
-		return err
+	err = errors.Join(tt.TLS.Close())
+	if tt.tunnelKeyLogWriter != nil {
+		err = errors.Join(tt.tunnelKeyLogWriter.Close())
 	}
-	return tt.TLS.Close()
+	return err
 }
