@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"time"
@@ -101,7 +102,14 @@ func (tt *TLS) Authenticate(certpath, keyLogFilename string) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer func() {
+			err := f.Close()
+			if err != nil {
+				slog.Error("failed to close key log file",
+					"error", err,
+				)
+			}
+		}()
 		tlsConfig.KeyLogWriter = f
 	}
 	tc := tls.Client(tt, tlsConfig)

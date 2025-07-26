@@ -90,7 +90,7 @@ func (tt *TTLS) PAP(uname, pw string) error {
 func (tt *TTLS) Close() error {
 	var err error
 	tt.RecvKey, tt.SendKey, err = exportKeyingMaterial(tt.client, ttlsMasterKeyLabel)
-	err = errors.Join(tt.TLS.Close())
+	err = errors.Join(err, tt.TLS.Close())
 	if tt.tunnelKeyLogWriter != nil {
 		err = errors.Join(tt.tunnelKeyLogWriter.Close())
 	}
