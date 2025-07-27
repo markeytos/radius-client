@@ -9,15 +9,18 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"os"
 )
 
 type PEAP struct {
 	*TLS
-	client *tls.Conn
+	tunnelKeyLogWriter *os.File
+	client             *tls.Conn
 }
 
-func CreatePEAP(session *Session, caCert, tlsVersion, serverName string, tlsSkipHostnameCheck bool) (*PEAP, error) {
+func CreatePEAP(session *Session, caCert, tlsVersion, serverName, tlsTunnelKeyLogFilename string, tlsSkipHostnameCheck bool) (*PEAP, error) {
 	t, err := internalCreateTLS(session, caCert, tlsVersion, tlsSkipHostnameCheck, TypePEAP)
 	if err != nil {
 		return nil, err
@@ -31,7 +34,18 @@ func CreatePEAP(session *Session, caCert, tlsVersion, serverName string, tlsSkip
 		ServerName:             serverName,
 		VerifyPeerCertificate:  t.verifyCertificateChain,
 	}
-	return &PEAP{TLS: t, client: tls.Client(t, tlsConfig)}, nil
+	var peap *PEAP
+	if tlsTunnelKeyLogFilename != "" {
+		f, err := os.OpenFile(tlsTunnelKeyLogFilename, os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.KeyLogWriter = f
+		peap = &PEAP{TLS: t, tunnelKeyLogWriter: f, client: tls.Client(t, tlsConfig)}
+	} else {
+		peap = &PEAP{TLS: t, client: tls.Client(t, tlsConfig)}
+	}
+	return peap, nil
 }
 
 func (tt *PEAP) MaxDataSize() int {
@@ -94,5 +108,8 @@ func (tt *PEAP) Close() error {
 	}
 
 	tt.RecvKey, tt.SendKey, err = exportKeyingMaterial(tt.client, eapMasterKeyLabel)
+	if tt.tunnelKeyLogWriter != nil {
+		err = errors.Join(tt.tunnelKeyLogWriter.Close())
+	}
 	return err
 }

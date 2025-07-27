@@ -15,23 +15,25 @@ import (
 )
 
 var (
-	retries           int
-	retryIntervalStr  string
-	retryInterval     time.Duration
-	udpAuthPort       int
-	udpAcctPort       int
-	udpRetries        int
-	udpMTUSize        int
-	udpTimeoutStr     string
-	udpTimeout        time.Duration
-	tcpPort           int
-	tlsTimeoutStr     string
-	tlsTimeout        time.Duration
-	minWriteJitterStr string
-	minWriteJitter    time.Duration
-	maxWriteJitterStr string
-	maxWriteJitter    time.Duration
-	radsecUnsafe      bool
+	retries                         int
+	retryIntervalStr                string
+	retryInterval                   time.Duration
+	udpAuthPort                     int
+	udpAcctPort                     int
+	udpRetries                      int
+	udpMTUSize                      int
+	udpTimeoutStr                   string
+	udpTimeout                      time.Duration
+	tcpPort                         int
+	tlsTimeoutStr                   string
+	tlsTimeout                      time.Duration
+	minWriteJitterStr               string
+	minWriteJitter                  time.Duration
+	maxWriteJitterStr               string
+	maxWriteJitter                  time.Duration
+	radsecUnsafe                    bool
+	tlsAuthenticationKeyLogFilename string
+	tlsTunnelKeyLogFilename         string
 )
 
 // Attribute variables, each string should be of the format `<label>:<value>[:<type>]`
@@ -126,6 +128,8 @@ entry must be of the format
 only checked in the last packet of the handshake.
 Each entry must be of the format
 `+"`[type:value[:value-type] ...]`.")
+	rootCmd.PersistentFlags().StringVar(&tlsAuthenticationKeyLogFilename, "tls-auth-key-log-filename", "", "TLS authentication key log file name")
+	rootCmd.PersistentFlags().StringVar(&tlsTunnelKeyLogFilename, "tls-tunn-key-log-filename", "", "TLS tunnel key log file")
 
 	rootCmd.AddCommand(authCmd, acctCmd, statusCmd)
 }
