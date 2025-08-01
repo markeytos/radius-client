@@ -78,7 +78,7 @@ func newUDPAcctSession(address, sharedSecret string, mtuSize int, sendattrs, rec
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok {
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok && !skipCheckAcctNasId {
 		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
 	sendattrs[radius.AttributeTypeFramedMtu] = []string{strconv.Itoa(mtuSize)}
@@ -101,7 +101,7 @@ func newTLSAcctSession(address, serverCA, clientCer string, sendattrs, recvattrs
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
-	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok {
+	if _, ok := sendattrs[radius.AttributeTypeNasIdentifier]; !ok && !skipCheckAcctNasId {
 		sendattrs[radius.AttributeTypeNasIdentifier] = []string{"radius-client"}
 	}
 	return radius.NewAccountingSession(conn, "radsec", tlsTimeout, minWriteJitter, maxWriteJitter, 1, radius.DatagramMaxLen, sendattrs, recvattrs)

@@ -10,6 +10,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	skipCheckAcctStatusType bool
+	skipCheckAcctSessionId  bool
+	skipCheckAcctNasId      bool
+)
+
 var acctCmd = &cobra.Command{
 	Use:     "accounting",
 	Aliases: []string{"acct"},
@@ -45,6 +51,9 @@ var acctTlsCmd = &cobra.Command{
 
 func init() {
 	acctCmd.AddCommand(acctUdpCmd, acctTlsCmd)
+	acctCmd.PersistentFlags().BoolVar(&skipCheckAcctStatusType, "skip-check-acct-status-type", false, "Do not require Acct-Status-Type.")
+	acctCmd.PersistentFlags().BoolVar(&skipCheckAcctSessionId, "skip-check-acct-session-id", false, "Do not require Acct-Session-Id")
+	acctCmd.PersistentFlags().BoolVar(&skipCheckAcctNasId, "skip-check-acct-nas-id", false, "Do not require one of either NAS-Identifier or NAS-IP-Address")
 }
 
 func acct(f func() (*radius.AccountingSession, error)) error {
@@ -63,6 +72,10 @@ func acct(f func() (*radius.AccountingSession, error)) error {
 				"error", err)
 		}
 	}()
+	session.SkipCheckAcctStatusType = skipCheckAcctStatusType
+	session.SkipCheckAcctSessionId = skipCheckAcctSessionId
+	session.SkipCheckAcctNasId = skipCheckAcctNasId
+
 	err = session.Account()
 	if err != nil {
 		slog.Error("failed accounting",
