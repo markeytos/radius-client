@@ -26,9 +26,11 @@ To install the tool locally for use, you can run the following command
 
 ```bash
 go install github.com/markeytos/radius-client@latest
+```
 
-# To install a specific version, replace `latest` with a version
-# $ go install github.com/markeytos/radius-client@vX.X.X
+To install a specific version, replace `latest` with a version
+```bash
+go install github.com/markeytos/radius-client@vX.X.X
 ```
 
 ### Status
