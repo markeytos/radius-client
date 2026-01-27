@@ -114,10 +114,10 @@ func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 				AttributeTypeAcctMultiSessionId,
 				AttributeTypeLoginLatPort,
 				AttributeTypeTunnelPrivateGroupId,
+				AttributeTypeClass,
 				AttributeTypeEgressVlanName:
 				attrs = append(attrs, newAttribute(t, []byte(v)))
 			case AttributeTypeState,
-				AttributeTypeClass,
 				AttributeTypeProxyState,
 				AttributeTypeEapMessage,
 				AttributeTypeLoginLatGroup,

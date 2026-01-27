@@ -35,7 +35,7 @@ These are the supported attributes that can be defined and their value types:
 - `Callback-Number`: `string`
 - `Called-Station-Id`: `string`
 - `Calling-Station-Id`: `string`
-- `Class`: `binary`
+- `Class`: `string`
 - `EAP-Message`: `binary`
 - `Egress-VLAN-Name`: `string`
 - `Egress-VLANID`: _not implemented_
