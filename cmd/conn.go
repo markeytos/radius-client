@@ -29,7 +29,7 @@ func dialUDP(ip string, port int) (net.Conn, error) {
 		},
 		Timeout: 10 * time.Second,
 	}
-	return d.Dial("udp", fmt.Sprintf("%s:%d", ip, port))
+	return d.Dial("udp", net.JoinHostPort(ip, strconv.Itoa(port)))
 }
 
 func dialTLS(address, caCert, clientCert string) (*tls.Conn, error) {
