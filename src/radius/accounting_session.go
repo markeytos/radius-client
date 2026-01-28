@@ -14,6 +14,9 @@ import (
 
 type AccountingSession struct {
 	session
+	SkipCheckAcctStatusType bool
+	SkipCheckAcctSessionId  bool
+	SkipCheckAcctNasId      bool
 }
 
 func NewAccountingSession(conn net.Conn, ss string, timeout, minWriteJitter, maxWriteJitter time.Duration, retries, mtuSize int, sendattrsMap, recvattrsMap AttributeMap) (*AccountingSession, error) {
@@ -49,11 +52,18 @@ func (s *AccountingSession) Status() error {
 }
 
 func (s *AccountingSession) Account() error {
-	if !s.sendAttributes.ContainsType(AttributeTypeAcctStatusType) {
+	if !s.SkipCheckAcctStatusType &&
+		!s.sendAttributes.ContainsType(AttributeTypeAcctStatusType) {
 		return fmt.Errorf("acct: missing attribute Acct-Status-Type")
 	}
-	if !s.sendAttributes.ContainsType(AttributeTypeAcctSessionId) {
+	if !s.SkipCheckAcctSessionId &&
+		!s.sendAttributes.ContainsType(AttributeTypeAcctSessionId) {
 		return fmt.Errorf("acct: missing attribute Acct-Session-Id")
+	}
+	if !s.SkipCheckAcctNasId &&
+		!s.sendAttributes.ContainsType(AttributeTypeNasIdentifier) &&
+		!s.sendAttributes.ContainsType(AttributeTypeNasIpAddress) {
+		return fmt.Errorf("acct: missing attribute NAS-Identifier or ")
 	}
 
 	sd, err := s.newAccountingRequestDatagram()
