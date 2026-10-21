@@ -17,6 +17,7 @@ Each attribute has an expected value type, which are the following:
 
 These are the supported attributes that can be defined and their value types:
 
+- `APC-Service-Type`: [`enum`](#apc-service-type)
 - `Acct-Authentic`: [`enum`](#acct-authentic)
 - `Acct-Delay-Time`: `uint`
 - `Acct-Input-Octets`: `uint`
@@ -29,18 +30,21 @@ These are the supported attributes that can be defined and their value types:
 - `Acct-Session-Time`: `uint`
 - `Acct-Status-Type`: [`enum`](#acct-status-type)
 - `Acct-Terminate-Cause`: [`enum`](#acct-terminate-cause)
+- `Aruba-User-Role`: `string`
 - `CHAP-Challenge`: _unsupported_
 - `CHAP-Password`: _unsupported_
 - `Callback-Id`: `string`
 - `Callback-Number`: `string`
 - `Called-Station-Id`: `string`
 - `Calling-Station-Id`: `string`
+- `Cisco-AVPair`: `string`
 - `Class`: `string`
 - `EAP-Message`: `binary`
 - `Egress-VLAN-Name`: `string`
 - `Egress-VLANID`: _not implemented_
 - `Error-Cause`: [`enum`](#error-cause)
 - `Filter-Id`: `string`
+- `Fortinet-Group-Name`: `string`
 - `Framed-AppleTalk-Link`: `uint`
 - `Framed-AppleTalk-Network`: `uint`
 - `Framed-AppleTalk-Zone`: `binary`
@@ -79,9 +83,61 @@ These are the supported attributes that can be defined and their value types:
 - `User-Name`: `string`
 - `User-Password`: _use `auth pap`_
 - `User-Priority-Table`: `binary`
-- `Vendor-Specific`: _not implemented_
+- `Vendor-Specific`: [see below](#vendor-specific-attributes)
+
+## Vendor specific attributes
+
+A vendor specific attribute is identified by a vendor ID and a vendor type,
+not by its attribute type, since every vendor attribute is carried in an
+attribute of type `Vendor-Specific`. The vendor attributes listed above are
+addressed by name just like any other attribute:
+
+```sh
+--attrs-to-recv Fortinet-Group-Name:NetAdmins \
+--attrs-to-recv APC-Service-Type:Admin
+```
+
+The value is everything that follows the attribute name, so it may hold
+colons and equals signs of its own, as a Cisco AVPair does:
+
+```sh
+--attrs-to-recv Cisco-AVPair:shell:priv-lvl=15
+```
+
+| Attribute             | Vendor   | Vendor ID | Vendor type |
+| --------------------- | -------- | --------- | ----------- |
+| `APC-Service-Type`    | APC      | 318       | 1           |
+| `Aruba-User-Role`     | Aruba    | 14823     | 1           |
+| `Cisco-AVPair`        | Cisco    | 9         | 1           |
+| `Fortinet-Group-Name` | Fortinet | 12356     | 1           |
+
+Any other vendor attribute is addressed by number, as
+`Vendor-Specific:<vendor ID>:<vendor type>`, and takes a `binary` value:
+
+```sh
+--attrs-to-recv Vendor-Specific:12356:1:4e657441646d696e73
+```
+
+> [!NOTE]
+> A vendor attribute that is in the table above keeps its value type when it
+> is addressed by number, so `Vendor-Specific:318:1:Admin` and
+> `APC-Service-Type:Admin` are the same attribute.
+
+A server may pack several vendor attributes of one vendor into a single
+attribute of type `Vendor-Specific`, which RFC 2865 §5.26 allows. An attribute
+given to `--attrs-to-recv` is matched against each vendor attribute a reply
+holds, so it is found either way.
 
 ## Enum values
+
+### APC-Service-Type
+
+- `Admin`
+- `Device`
+- `ReadOnly`
+- `Outlet`
+- `Card`
+- `NetworkOnly`
 
 ### Acct-Authentic
 
