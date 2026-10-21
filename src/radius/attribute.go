@@ -19,13 +19,36 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 )
 
 const (
 	maxAttributeLen = 255 - 2
 )
 
-type AttributeMap map[AttributeType][]string
+// AttributeKey identifies an attribute to serialize. All vendor specific
+// attributes share a single attribute type, so the vendor ID and vendor type
+// are what tell them apart. Both are zero for every other attribute.
+type AttributeKey struct {
+	Type       AttributeType
+	VendorId   VendorId
+	VendorType VendorType
+}
+
+type AttributeMap map[AttributeKey][]string
+
+// ContainsType reports whether the map holds a non vendor specific attribute
+// of type t.
+func (m AttributeMap) ContainsType(t AttributeType) bool {
+	_, ok := m[AttributeKey{Type: t}]
+	return ok
+}
+
+// SetType sets the values of a non vendor specific attribute of type t,
+// replacing the values already held for it.
+func (m AttributeMap) SetType(t AttributeType, vs ...string) {
+	m[AttributeKey{Type: t}] = vs
+}
 
 type Attribute struct {
 	Type  AttributeType
@@ -96,7 +119,8 @@ func writeMessageAuthenticator(d *Datagram, ma *Attribute, secret string) error 
 
 func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 	attrs := make([]*Attribute, 0, len(attrMap))
-	for t, vs := range attrMap {
+	for k, vs := range attrMap {
+		t := k.Type
 		for _, v := range vs {
 			switch t {
 			case AttributeTypeUserName,
@@ -185,7 +209,11 @@ func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 				}
 				attrs = append(attrs, a)
 			case AttributeTypeVendorSpecific:
-				return attrs, fmt.Errorf("TODO: VSA not implemented yet")
+				a, err := serializeVendorSpecificAttribute(k.VendorId, k.VendorType, v)
+				if err != nil {
+					return attrs, err
+				}
+				attrs = append(attrs, a)
 			case AttributeTypeEgressVlanId:
 				return attrs, fmt.Errorf("TODO: egress VLAN ID not implemented yet")
 			case AttributeTypeUserPassword:
@@ -211,6 +239,15 @@ func (as Attributes) FirstOfType(t AttributeType) *Attribute {
 
 func (as *Attributes) ContainsType(t AttributeType) bool {
 	return as.FirstOfType(t) != nil
+}
+
+// String names the attribute. Vendor specific attributes are named after the
+// vendor attribute they hold rather than after their shared attribute type.
+func (a *Attribute) String() string {
+	if a.Type == AttributeTypeVendorSpecific {
+		return a.vendorSpecificString()
+	}
+	return a.Type.String()
 }
 
 type AttributeType uint8
@@ -362,6 +399,27 @@ const (
 	AttributeTypeLabelEapMessage           AttributeTypeLabel = "EAP-Message"
 	AttributeTypeLabelMessageAuthenticator AttributeTypeLabel = "Message-Authenticator"
 )
+
+// AttributeKeyFromString resolves an attribute label to the key identifying
+// the attribute. Vendor specific attributes are addressed either by the name
+// of the vendor attribute, e.g. `Fortinet-Group-Name`, or generically as
+// `Vendor-Specific:<vendor ID>:<vendor type>`.
+func AttributeKeyFromString(label string) (AttributeKey, error) {
+	if k, ok := vendorAttributeKeyFromLabel(label); ok {
+		return k, nil
+	}
+	if strings.HasPrefix(label, string(AttributeTypeLabelVendorSpecific)+":") {
+		return vendorAttributeKeyFromGenericLabel(label)
+	}
+	t, err := AttributeTypeFromString(label)
+	if err != nil {
+		return AttributeKey{}, err
+	}
+	if t == AttributeTypeVendorSpecific {
+		return AttributeKey{}, fmt.Errorf("vendor specific attribute must be addressed by vendor attribute name or as %s:<vendor ID>:<vendor type>", AttributeTypeLabelVendorSpecific)
+	}
+	return AttributeKey{Type: t}, nil
+}
 
 func AttributeTypeFromString(label string) (AttributeType, error) {
 	switch AttributeTypeLabel(label) {

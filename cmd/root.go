@@ -135,7 +135,9 @@ Each entry must be of the format
 }
 
 func parseAttributes(attrs []string) (radius.AttributeMap, error) {
-	r := regexp.MustCompile(`^(?P<Label>[A-Za-z0-9_-]+):(?P<Value>[\ \.A-Za-z0-9_-]+)$`)
+	// The label is everything up to the last colon so that vendor specific
+	// attributes can be addressed as `Vendor-Specific:<vendor ID>:<vendor type>`
+	r := regexp.MustCompile(`^(?P<Label>[A-Za-z0-9_:-]+):(?P<Value>[\ \.A-Za-z0-9_-]+)$`)
 
 	attrMap := make(radius.AttributeMap)
 
@@ -145,15 +147,15 @@ func parseAttributes(attrs []string) (radius.AttributeMap, error) {
 			return nil, fmt.Errorf("invalid attribute entry: %s", a)
 		}
 
-		at, err := radius.AttributeTypeFromString(submatch[r.SubexpIndex("Label")])
+		ak, err := radius.AttributeKeyFromString(submatch[r.SubexpIndex("Label")])
 		if err != nil {
 			return nil, fmt.Errorf("invalid attribute label: %w", err)
 		}
 		val := submatch[r.SubexpIndex("Value")]
-		if slices.Contains(attrMap[at], val) {
+		if slices.Contains(attrMap[ak], val) {
 			return nil, fmt.Errorf("duplicate attribute value: %s, %s", a, val)
 		}
-		attrMap[at] = append(attrMap[at], val)
+		attrMap[ak] = append(attrMap[ak], val)
 	}
 
 	return attrMap, nil

@@ -165,13 +165,11 @@ func (s *session) lastReadDatagramHasExpectedAttributes() error {
 		matched := false
 		for _, attr := range s.lastReadDatagram.Attributes {
 			if expected.Type == attr.Type && subtle.ConstantTimeCompare(expected.Value, attr.Value) == 1 {
-				fmt.Printf("G %x\n", expected.Value)
 				matched = true
 			}
 		}
 		if !matched {
-			fmt.Printf("B %x\n", expected.Value)
-			expectedAttrs = append(expectedAttrs, expected.Type.String())
+			expectedAttrs = append(expectedAttrs, expected.String())
 		}
 	}
 	if len(expectedAttrs) > 0 {
