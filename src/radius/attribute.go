@@ -14,6 +14,7 @@ package radius
 import (
 	"crypto/hmac"
 	"crypto/md5"
+	"crypto/subtle"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -248,6 +249,29 @@ func (a *Attribute) String() string {
 		return a.vendorSpecificString()
 	}
 	return a.Type.String()
+}
+
+// matches reports whether a carries the attribute expected. A vendor specific
+// attribute is matched on the vendor attributes it holds rather than on its
+// whole value, since a server may pack several vendor attributes into a single
+// attribute of type Vendor-Specific.
+func (a *Attribute) matches(expected *Attribute) bool {
+	if a.Type != expected.Type {
+		return false
+	}
+	if a.Type != AttributeTypeVendorSpecific {
+		return subtle.ConstantTimeCompare(a.Value, expected.Value) == 1
+	}
+	evas := expected.vendorAttributes()
+	if len(evas) == 0 {
+		return false
+	}
+	for _, eva := range evas {
+		if !a.holdsVendorAttribute(eva) {
+			return false
+		}
+	}
+	return true
 }
 
 type AttributeType uint8

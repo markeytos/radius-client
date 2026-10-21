@@ -109,16 +109,20 @@ func (s *AuthenticationSession) VerifyEAP(recvkey, sendkey []byte) error {
 	}
 
 	mismatchedKeys := make([]string, 0, 2)
+	// A key shorter than its two byte salt is malformed, and is reported as a
+	// mismatch rather than read past the end of the attribute.
 	recvkeyAttr := s.lastReadDatagram.Attributes.FirstVendorSpecificAttributeOfType(VendorIdMicrosoft, VendorTypeMicrosoftMPPERecvKey)
 	if recvkeyAttr != nil {
-		if !s.sessionKeyEqual(recvkey, s.lastWrittenDatagram.Header.Authenticator[:], recvkeyAttr.Value[:2], recvkeyAttr.Value[2:]) {
+		if len(recvkeyAttr.Value) < 2 ||
+			!s.sessionKeyEqual(recvkey, s.lastWrittenDatagram.Header.Authenticator[:], recvkeyAttr.Value[:2], recvkeyAttr.Value[2:]) {
 			mismatchedKeys = append(mismatchedKeys, "MS-MPPE-Recv-Key")
 		}
 	}
 
 	sendkeyAttr := s.lastReadDatagram.Attributes.FirstVendorSpecificAttributeOfType(VendorIdMicrosoft, VendorTypeMicrosoftMPPESendKey)
 	if sendkeyAttr != nil {
-		if !s.sessionKeyEqual(sendkey, s.lastWrittenDatagram.Header.Authenticator[:], sendkeyAttr.Value[:2], sendkeyAttr.Value[2:]) {
+		if len(sendkeyAttr.Value) < 2 ||
+			!s.sessionKeyEqual(sendkey, s.lastWrittenDatagram.Header.Authenticator[:], sendkeyAttr.Value[:2], sendkeyAttr.Value[2:]) {
 			mismatchedKeys = append(mismatchedKeys, "MS-MPPE-Send-Key")
 		}
 	}

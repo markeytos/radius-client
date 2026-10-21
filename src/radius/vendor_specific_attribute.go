@@ -25,6 +25,7 @@ so it is the length of the vendor value plus two.
 package radius
 
 import (
+	"crypto/subtle"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -154,12 +155,46 @@ func newVendorSpecificAttribute(id VendorId, t VendorType, v []byte) (*Attribute
 	return a, nil
 }
 
+// vendorAttributes reads the vendor attributes held in a. A server may pack
+// several of them into a single attribute of type Vendor-Specific, so this
+// walks the whole value rather than reading only the first. Reading stops at
+// the first vendor attribute whose vendor length does not fit, since the ones
+// behind it cannot be found without it, and an attribute of any other type
+// holds none at all.
+func (a *Attribute) vendorAttributes() []*VendorSpecificAttribute {
+	if a.Type != AttributeTypeVendorSpecific || len(a.Value) < vendorAttributeHeaderLen {
+		return nil
+	}
+	id := VendorId(binary.BigEndian.Uint32(a.Value[:4]))
+	var vas []*VendorSpecificAttribute
+	b := a.Value[4:]
+	for len(b) >= 2 {
+		l := int(b[1])
+		if l < 2 || l > len(b) {
+			break
+		}
+		vas = append(vas, &VendorSpecificAttribute{Id: id, Type: VendorType(b[0]), Value: b[2:l]})
+		b = b[l:]
+	}
+	return vas
+}
+
+// holdsVendorAttribute reports whether a holds a vendor attribute equal to va.
+func (a *Attribute) holdsVendorAttribute(va *VendorSpecificAttribute) bool {
+	for _, ava := range a.vendorAttributes() {
+		if ava.Id == va.Id && ava.Type == va.Type &&
+			subtle.ConstantTimeCompare(ava.Value, va.Value) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
 func (as Attributes) FirstVendorSpecificAttributeOfType(id VendorId, t VendorType) *VendorSpecificAttribute {
 	for _, a := range as {
-		if a.Type == AttributeTypeVendorSpecific && len(a.Value) > 6 {
-			if id == VendorId(binary.BigEndian.Uint32(a.Value[:4])) &&
-				t == VendorType(a.Value[4]) {
-				return &VendorSpecificAttribute{Id: id, Type: t, Value: a.Value[6 : 4+a.Value[5]]}
+		for _, va := range a.vendorAttributes() {
+			if va.Id == id && va.Type == t {
+				return va
 			}
 		}
 	}

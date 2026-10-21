@@ -135,9 +135,12 @@ Each entry must be of the format
 }
 
 func parseAttributes(attrs []string) (radius.AttributeMap, error) {
-	// The label is everything up to the last colon so that vendor specific
-	// attributes can be addressed as `Vendor-Specific:<vendor ID>:<vendor type>`
-	r := regexp.MustCompile(`^(?P<Label>[A-Za-z0-9_:-]+):(?P<Value>[\ \.A-Za-z0-9_-]+)$`)
+	// A vendor specific attribute addressed by number carries the vendor ID and
+	// the vendor type in its label, every other label is a single word. The
+	// value is therefore whatever follows, and may hold colons and equals signs
+	// of its own, as a Cisco AVPair does.
+	vsa := regexp.QuoteMeta(string(radius.AttributeTypeLabelVendorSpecific))
+	r := regexp.MustCompile(`^(?P<Label>` + vsa + `:[0-9]+:[0-9]+|[A-Za-z0-9_-]+):(?P<Value>[\x20-\x7E]+)$`)
 
 	attrMap := make(radius.AttributeMap)
 

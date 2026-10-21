@@ -97,6 +97,13 @@ addressed by name just like any other attribute:
 --attrs-to-recv APC-Service-Type:Admin
 ```
 
+The value is everything that follows the attribute name, so it may hold
+colons and equals signs of its own, as a Cisco AVPair does:
+
+```sh
+--attrs-to-recv Cisco-AVPair:shell:priv-lvl=15
+```
+
 | Attribute             | Vendor   | Vendor ID | Vendor type |
 | --------------------- | -------- | --------- | ----------- |
 | `APC-Service-Type`    | APC      | 318       | 1           |
@@ -115,6 +122,11 @@ Any other vendor attribute is addressed by number, as
 > A vendor attribute that is in the table above keeps its value type when it
 > is addressed by number, so `Vendor-Specific:318:1:Admin` and
 > `APC-Service-Type:Admin` are the same attribute.
+
+A server may pack several vendor attributes of one vendor into a single
+attribute of type `Vendor-Specific`, which RFC 2865 §5.26 allows. An attribute
+given to `--attrs-to-recv` is matched against each vendor attribute a reply
+holds, so it is found either way.
 
 ## Enum values
 

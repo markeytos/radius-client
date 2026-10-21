@@ -6,6 +6,7 @@ Test RADIUS vendor specific attribute encoding
 package radius
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -194,6 +195,92 @@ func TestInvalidVendorSpecificAttributes(t *testing.T) {
 		}
 		if _, err := serializeAttributeMap(AttributeMap{k: {test.value}}); err == nil {
 			t.Fatalf("expected an error for %s:%s", test.label, test.value)
+		}
+	}
+}
+
+// packedVendorSpecificAttribute builds the attribute a server sends when it
+// packs several vendor attributes of one vendor into a single attribute of
+// type Vendor-Specific, which RFC 2865 section 5.26 allows.
+func packedVendorSpecificAttribute(id VendorId, vas ...VendorSpecificAttribute) *Attribute {
+	v := make([]byte, 4)
+	binary.BigEndian.PutUint32(v, uint32(id))
+	for _, va := range vas {
+		v = append(v, byte(va.Type), byte(2+len(va.Value)))
+		v = append(v, va.Value...)
+	}
+	return &Attribute{Type: AttributeTypeVendorSpecific, Value: v}
+}
+
+func TestPackedVendorSpecificAttributesMatch(t *testing.T) {
+	// Fortinet-Group-Name:NetAdmins alongside Fortinet-Vdom-Name:root, vendor
+	// type 3, in one attribute of type Vendor-Specific
+	recv := packedVendorSpecificAttribute(VendorIdFortinet,
+		VendorSpecificAttribute{Type: VendorTypeFortinetGroupName, Value: []byte("NetAdmins")},
+		VendorSpecificAttribute{Type: 3, Value: []byte("root")},
+	)
+
+	if !recv.matches(serializeOne(t, "Fortinet-Group-Name", "NetAdmins")) {
+		t.Fatalf("packed vendor specific attribute did not match the expected attribute")
+	}
+	if !recv.matches(serializeOne(t, "Vendor-Specific:12356:3", hex.EncodeToString([]byte("root")))) {
+		t.Fatalf("second vendor attribute of a packed attribute did not match")
+	}
+	if recv.matches(serializeOne(t, "Fortinet-Group-Name", "Guests")) {
+		t.Fatalf("packed vendor specific attribute matched a different value")
+	}
+	if recv.matches(serializeOne(t, "Aruba-User-Role", "NetAdmins")) {
+		t.Fatalf("packed vendor specific attribute matched a different vendor")
+	}
+
+	va := Attributes{recv}.FirstVendorSpecificAttributeOfType(VendorIdFortinet, 3)
+	if va == nil || string(va.Value) != "root" {
+		t.Fatalf("could not read the second vendor attribute out of the packed attribute")
+	}
+}
+
+// A single vendor attribute per attribute of type Vendor-Specific is the form
+// this client sends, and must keep matching.
+func TestUnpackedAttributesMatch(t *testing.T) {
+	matching := [][2]string{
+		{"APC-Service-Type", "Admin"},
+		{"Cisco-AVPair", "shell:priv-lvl=15"},
+		{"User-Name", "alice"},
+	}
+	for _, m := range matching {
+		if !serializeOne(t, m[0], m[1]).matches(serializeOne(t, m[0], m[1])) {
+			t.Fatalf("%s:%s did not match itself", m[0], m[1])
+		}
+	}
+	if serializeOne(t, "APC-Service-Type", "Admin").matches(serializeOne(t, "APC-Service-Type", "Device")) {
+		t.Fatalf("attribute matched a different value")
+	}
+	if serializeOne(t, "User-Name", "alice").matches(serializeOne(t, "Filter-Id", "alice")) {
+		t.Fatalf("attribute matched a different attribute type")
+	}
+}
+
+// A server reply is not trusted to be well formed, so a vendor length that
+// does not fit the attribute must be ignored rather than read past.
+func TestMalformedVendorSpecificAttributes(t *testing.T) {
+	malformed := []*Attribute{
+		{Type: AttributeTypeVendorSpecific, Value: []byte{}},
+		{Type: AttributeTypeVendorSpecific, Value: []byte{0x00, 0x00, 0x30, 0x44}},
+		// vendor length runs past the end of the attribute
+		{Type: AttributeTypeVendorSpecific, Value: []byte{0x00, 0x00, 0x30, 0x44, 0x01, 0x40, 'a', 'b'}},
+		// vendor length shorter than the two bytes it covers
+		{Type: AttributeTypeVendorSpecific, Value: []byte{0x00, 0x00, 0x30, 0x44, 0x01, 0x00, 'a', 'b'}},
+	}
+	expected := serializeOne(t, "Fortinet-Group-Name", "ab")
+	for _, a := range malformed {
+		if a.matches(expected) {
+			t.Fatalf("malformed vendor specific attribute matched: %x", a.Value)
+		}
+		if (Attributes{a}).FirstVendorSpecificAttributeOfType(VendorIdFortinet, VendorTypeFortinetGroupName) != nil {
+			t.Fatalf("malformed vendor specific attribute was read: %x", a.Value)
+		}
+		if a.String() == "" {
+			t.Fatalf("malformed vendor specific attribute was not named: %x", a.Value)
 		}
 	}
 }

@@ -164,7 +164,7 @@ func (s *session) lastReadDatagramHasExpectedAttributes() error {
 	for _, expected := range s.recvAttributes {
 		matched := false
 		for _, attr := range s.lastReadDatagram.Attributes {
-			if expected.Type == attr.Type && subtle.ConstantTimeCompare(expected.Value, attr.Value) == 1 {
+			if attr.matches(expected) {
 				matched = true
 			}
 		}
