@@ -284,3 +284,71 @@ func TestMalformedVendorSpecificAttributes(t *testing.T) {
 		}
 	}
 }
+
+// A server may also send each vendor attribute in its own attribute of type
+// Vendor-Specific, which is how MS-MPPE keys arrive.
+func TestVendorAttributesAcrossSeparateAttributes(t *testing.T) {
+	as := Attributes{
+		packedVendorSpecificAttribute(VendorIdMicrosoft,
+			VendorSpecificAttribute{Type: VendorTypeMicrosoftMPPESendKey, Value: []byte("send")}),
+		packedVendorSpecificAttribute(VendorIdMicrosoft,
+			VendorSpecificAttribute{Type: VendorTypeMicrosoftMPPERecvKey, Value: []byte("recv")}),
+	}
+	for _, test := range []struct {
+		t     VendorType
+		value string
+	}{
+		{VendorTypeMicrosoftMPPESendKey, "send"},
+		{VendorTypeMicrosoftMPPERecvKey, "recv"},
+	} {
+		va := as.FirstVendorSpecificAttributeOfType(VendorIdMicrosoft, test.t)
+		if va == nil || string(va.Value) != test.value {
+			t.Fatalf("vendor type %d was not found across separate attributes: %v", test.t, va)
+		}
+	}
+	if as.FirstVendorSpecificAttributeOfType(VendorIdCisco, VendorTypeCiscoAVPair) != nil {
+		t.Fatalf("a vendor attribute that is not there was found")
+	}
+}
+
+// The largest value that fits fills an attribute to the 255 byte maximum
+// without the vendor length byte wrapping. One byte more is rejected, which
+// TestInvalidVendorSpecificAttributes covers.
+func TestMaxLengthVendorSpecificAttribute(t *testing.T) {
+	a := serializeOne(t, "Fortinet-Group-Name", strings.Repeat("a", maxVendorAttributeLen))
+	if got := len(a.Value) + 2; got != 255 {
+		t.Fatalf("incorrect attribute length on the wire.\nexpected: \t255\ngot: \t\t%d", got)
+	}
+	if got := int(a.Value[5]); got != maxVendorAttributeLen+2 {
+		t.Fatalf("incorrect vendor length.\nexpected: \t%d\ngot: \t\t%d", maxVendorAttributeLen+2, got)
+	}
+	if !a.matches(a) {
+		t.Fatalf("attribute of the maximum length did not match itself")
+	}
+}
+
+// A vendor specific attribute is read straight out of a reply, so no value a
+// server can send may read past the end of it or fail to terminate.
+func FuzzVendorAttributes(f *testing.F) {
+	f.Add([]byte{0x00, 0x00, 0x30, 0x44, 0x01, 0x0b, 'N', 'e', 't'})
+	f.Add([]byte{0x00, 0x00, 0x30, 0x44, 0x01, 0x40, 'a', 'b'})
+	f.Add([]byte{0x00, 0x00, 0x30, 0x44, 0x01, 0x00})
+	f.Add([]byte{})
+
+	f.Fuzz(func(t *testing.T, b []byte) {
+		a := &Attribute{Type: AttributeTypeVendorSpecific, Value: b}
+		claimed := 0
+		for _, va := range a.vendorAttributes() {
+			if len(va.Value) > len(b) {
+				t.Fatalf("vendor value of %d bytes read out of a %d byte attribute", len(va.Value), len(b))
+			}
+			claimed += len(va.Value) + 2
+		}
+		if claimed > len(b) {
+			t.Fatalf("vendor attributes claim %d bytes of a %d byte attribute", claimed, len(b))
+		}
+		_ = a.String()
+		_ = a.matches(a)
+		_ = (Attributes{a}).FirstVendorSpecificAttributeOfType(VendorIdFortinet, VendorTypeFortinetGroupName)
+	})
+}
