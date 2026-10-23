@@ -40,8 +40,8 @@ These are the supported attributes that can be defined and their value types:
 - `Cisco-AVPair`: `string`
 - `Class`: `string`
 - `EAP-Message`: `binary`
-- `Egress-VLAN-Name`: `string`
-- `Egress-VLANID`: _not implemented_
+- `Egress-VLAN-Name`: `string`, optional [`tagged:` or `untagged:`](#egress-vlans)
+- `Egress-VLANID`: [`tagged:<vlan>` or `untagged:<vlan>`](#egress-vlans)
 - `Error-Cause`: [`enum`](#error-cause)
 - `Filter-Id`: `string`
 - `Fortinet-Group-Name`: `string`
@@ -77,9 +77,9 @@ These are the supported attributes that can be defined and their value types:
 - `Session-Timeout`: `uint`
 - `State`: `binary`
 - `Termination-Action`: [`enum`](#termination-action)
-- `Tunnel-Medium-Type`: [`enum`](#tunnel-medium-type)
-- `Tunnel-Private-Group-ID`: `string`
-- `Tunnel-Type`: [`enum`](#tunnel-type)
+- `Tunnel-Medium-Type`: [`enum`](#tunnel-medium-type), optional [tag](#tunnel-tags)
+- `Tunnel-Private-Group-ID`: `string`, optional [tag](#tunnel-tags)
+- `Tunnel-Type`: [`enum`](#tunnel-type), optional [tag](#tunnel-tags)
 - `User-Name`: `string`
 - `User-Password`: _use `auth pap`_
 - `User-Priority-Table`: `binary`
@@ -127,6 +127,47 @@ A server may pack several vendor attributes of one vendor into a single
 attribute of type `Vendor-Specific`, which RFC 2865 §5.26 allows. An attribute
 given to `--attrs-to-recv` is matched against each vendor attribute a reply
 holds, so it is found either way.
+
+## Tunnel tags
+
+[RFC 2868](https://datatracker.ietf.org/doc/html/rfc2868) puts a tag in the
+first value octet of `Tunnel-Type`, `Tunnel-Medium-Type`, and
+`Tunnel-Private-Group-ID`. The tag is a number from 0 to 31 and groups the
+attributes that describe one tunnel. Tag 0 means the tag is unused.
+
+Write the tag before the value. Omit it for an unused tag:
+
+```sh
+--attrs-to-recv Tunnel-Type:1:Virtual LAN \
+--attrs-to-recv Tunnel-Medium-Type:1:802 \
+--attrs-to-recv Tunnel-Private-Group-ID:1:20
+```
+
+`Tunnel-Private-Group-ID:20` is the string `20` with no tag octet. That is
+the unused-tag form, because the first byte of `20` is greater than 0x1F.
+`Tunnel-Private-Group-ID:0:20` is the same string with an explicit zero tag
+octet, which is what a server sends when it includes the tag and sets it to
+zero. A number greater than 31 is not a tag, so `32:20` is the whole string.
+
+## Egress VLANs
+
+[RFC 4675](https://datatracker.ietf.org/doc/html/rfc4675) marks a VLAN as
+tagged (`0x31`) or untagged (`0x32`). `Egress-VLANID` is that indication
+plus a VLAN id from 0 to 4095:
+
+```sh
+--attrs-to-recv Egress-VLANID:tagged:100
+--attrs-to-recv Egress-VLANID:untagged:100
+```
+
+`Egress-VLAN-Name` takes the same prefix. Without it, the name is sent as
+the raw string, which is the encoding this client used before the prefix
+existed:
+
+```sh
+--attrs-to-recv Egress-VLAN-Name:tagged:Engineering
+--attrs-to-send Egress-VLAN-Name:Engineering
+```
 
 ## Enum values
 

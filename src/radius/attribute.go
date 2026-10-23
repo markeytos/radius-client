@@ -138,9 +138,7 @@ func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 				AttributeTypeAcctSessionId,
 				AttributeTypeAcctMultiSessionId,
 				AttributeTypeLoginLatPort,
-				AttributeTypeTunnelPrivateGroupId,
-				AttributeTypeClass,
-				AttributeTypeEgressVlanName:
+				AttributeTypeClass:
 				attrs = append(attrs, newAttribute(t, []byte(v)))
 			case AttributeTypeState,
 				AttributeTypeProxyState,
@@ -200,8 +198,6 @@ func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 				AttributeTypeAcctAuthentic,
 				AttributeTypeAcctTerminateCause,
 				AttributeTypeNasPortType,
-				AttributeTypeTunnelType,
-				AttributeTypeTunnelMediumType,
 				AttributeTypeIngressFilters:
 				a := newEmptyAttribute(t, 4)
 				err := ParseAttributeEnumData(a.Value, t, v)
@@ -215,8 +211,30 @@ func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 					return attrs, err
 				}
 				attrs = append(attrs, a)
+			case AttributeTypeTunnelType, AttributeTypeTunnelMediumType:
+				a, err := serializeTunnelEnumAttribute(t, v)
+				if err != nil {
+					return attrs, err
+				}
+				attrs = append(attrs, a)
+			case AttributeTypeTunnelPrivateGroupId:
+				a, err := serializeTunnelPrivateGroupId(v)
+				if err != nil {
+					return attrs, err
+				}
+				attrs = append(attrs, a)
 			case AttributeTypeEgressVlanId:
-				return attrs, fmt.Errorf("TODO: egress VLAN ID not implemented yet")
+				a, err := serializeEgressVlanId(v)
+				if err != nil {
+					return attrs, err
+				}
+				attrs = append(attrs, a)
+			case AttributeTypeEgressVlanName:
+				a, err := serializeEgressVlanName(v)
+				if err != nil {
+					return attrs, err
+				}
+				attrs = append(attrs, a)
 			case AttributeTypeUserPassword:
 				return attrs, fmt.Errorf("use other constructors for encrypted attributes")
 			default:

@@ -123,7 +123,7 @@ Two variants of TLS can be tested, basic EAP-TLS and EAP-TLS inside a EAP-TTLS t
 $RADIUS_AUTH_COMMAND eap-tls --client-cert $CLIENT_CERT_PATH --ca-cert $SERVER_CA_CERT_PATH
 
 # Testing EAP-TLS over EAP-TTLS
-$RADIUS_AUTH_COMMAND eap-tls --tunnel-ca-cert $SERVER_CA_CERT_PATH \
+$RADIUS_AUTH_COMMAND eap-ttls-eap-tls --tunnel-ca-cert $SERVER_CA_CERT_PATH \
     --client-cert $CLIENT_CERT_PATH --ca-cert $SERVER_CA_CERT_PATH
 ```
 
@@ -171,6 +171,17 @@ In the example above, the client attempts to authenticate with `pap`, sends two
 additional attributes to the server, and expects three attributes from the server
 in the `Access-Accept` packet.
 
+A tunnel attribute can carry an [RFC 2868](https://datatracker.ietf.org/doc/html/rfc2868)
+tag, written before the value, so a VLAN returned to the NAS can be checked
+exactly. `Egress-VLANID` takes `tagged:<vlan>` or `untagged:<vlan>`.
+
+```bash
+$RADIUS_AUTH_COMMAND pap --username test_user --password test_password \
+    --attrs-to-recv Tunnel-Type:1:Virtual LAN \
+    --attrs-to-recv Tunnel-Medium-Type:1:802 \
+    --attrs-to-recv Tunnel-Private-Group-ID:1:20
+```
+
 You can view all attributes and their values can be defined in this [document](./RADIUS_ATTRIBUTES.md).
 
 ### Accounting
@@ -205,6 +216,8 @@ attributes generally have a `Acct-` prefix.
 - [RFC 2759: MS-CHAP-V2](https://datatracker.ietf.org/doc/html/rfc2759)
 - [RFC 2865: RADIUS](https://datatracker.ietf.org/doc/html/rfc2865)
 - [RFC 2866: RADIUS Accounting](https://datatracker.ietf.org/doc/html/rfc2866)
+- [RFC 2868: RADIUS Attributes for Tunnel Protocol Support](https://datatracker.ietf.org/doc/html/rfc2868)
+- [RFC 4675: RADIUS Attributes for Virtual LAN and Priority Support](https://datatracker.ietf.org/doc/html/rfc4675)
 - [RFC 3579: RADIUS EAP](https://datatracker.ietf.org/doc/html/rfc3579)
 - [RFC 3748: EAP](https://datatracker.ietf.org/doc/html/rfc3748)
 - [RFC 5080: Common RADIUS Implementation Issues and Suggested Fixes](https://datatracker.ietf.org/doc/html/rfc5080)

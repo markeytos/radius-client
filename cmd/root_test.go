@@ -41,6 +41,9 @@ func TestParseAttributes(t *testing.T) {
 		{"User-Name:user@example.com", radius.AttributeKey{Type: radius.AttributeTypeUserName}, "user@example.com"},
 		{"NAS-Identifier:fake-router", radius.AttributeKey{Type: radius.AttributeTypeNasIdentifier}, "fake-router"},
 		{"Filter-Id:20", radius.AttributeKey{Type: radius.AttributeTypeFilterId}, "20"},
+		// the tag stays in the value; encoding interprets it later
+		{"Tunnel-Private-Group-ID:1:20", radius.AttributeKey{Type: radius.AttributeTypeTunnelPrivateGroupId}, "1:20"},
+		{"Egress-VLANID:tagged:100", radius.AttributeKey{Type: radius.AttributeTypeEgressVlanId}, "tagged:100"},
 	}
 
 	for _, test := range tests {
