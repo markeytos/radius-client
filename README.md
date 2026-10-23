@@ -10,6 +10,7 @@ A RADIUS client that can carry out the following authentication protocols:
 - `eap-ttls-eap-ms-chapv2`
 - `eap-ttls-eap-tls`
 - `peap-ms-chapv2`
+- `teap-eap-tls`
 
 As well as `status` packets and accounting (WIP).
 
@@ -126,6 +127,37 @@ $RADIUS_AUTH_COMMAND eap-tls --client-cert $CLIENT_CERT_PATH --ca-cert $SERVER_C
 $RADIUS_AUTH_COMMAND eap-tls --tunnel-ca-cert $SERVER_CA_CERT_PATH \
     --client-cert $CLIENT_CERT_PATH --ca-cert $SERVER_CA_CERT_PATH
 ```
+
+#### TEAP with EAP-TLS
+
+TEAP ([RFC 9930](https://www.rfc-editor.org/rfc/rfc9930)) can authenticate the device and
+the user in a single session, each with EAP-TLS inside the TEAP tunnel. Pass the device
+certificate, the user certificate, or both:
+
+```bash
+$RADIUS_AUTH_COMMAND teap-eap-tls --tunnel-ca-cert $SERVER_CA_CERT_PATH \
+    --ca-cert $SERVER_CA_CERT_PATH \
+    --device-cert $DEVICE_CERT_PATH --user-cert $USER_CERT_PATH
+```
+
+The client approximates the Windows TEAP supplicant:
+
+- No certificate is presented while building the TEAP tunnel, only by the inner methods.
+- The server's Identity-Type TLV picks the credential. A request for a type that was not
+  passed is answered with the other one, as RFC 9930 asks of peers. Without an
+  Identity-Type, the device goes first.
+- The device identity is `host/` followed by the first DNS name of its certificate, and the
+  user identity is the UPN of their certificate, else its first email address. Override
+  them with `--device-identity` and `--user-identity`.
+- Inner methods are bound with the MSK Compound MAC only, which RFC 9930 section 5.2
+  describes as the behaviour of the most common supplicant. The EMSK Compound MAC is
+  neither checked nor sent, so a server that sends only the EMSK Compound MAC fails.
+- Inner EAP-TLS messages are fragmented to the same size as the outer TEAP ones.
+
+The server certificate of both the tunnel and the inner methods is checked against the
+server address, or `--tls-skip-hostname-check` skips that check. With TLS 1.3, keys are
+derived as RFC 9427 defines for TEAP, unless the server's first Compound MAC shows it
+derives them as for TLS 1.2, as hostapd does, which the client accepts with a warning.
 
 The default TLS version supported is 1.2, 1.3 is supported but has not been tested,
 and it can be enabled by adding the flag `--tls-version 1.X`.

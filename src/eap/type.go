@@ -17,4 +17,5 @@ const (
 	TypePEAP         Type = 25
 	TypeMsCHAPv2     Type = 26
 	TypeExtensions   Type = 33
+	TypeTEAP         Type = 55
 )

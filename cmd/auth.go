@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/markeytos/radius-client/src/eap"
+	"github.com/markeytos/radius-client/src/eap/teap"
 	"github.com/markeytos/radius-client/src/radius"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +25,7 @@ const (
 	authEapTtlsEapMsCHAPv2 = "eap-ttls-eap-ms-chapv2"
 	authEapTtlsEapTLS      = "eap-ttls-eap-tls"
 	authPeapMsCHAPv2       = "peap-ms-chapv2"
+	authTeapEapTLS         = "teap-eap-tls"
 )
 
 // required values for protocols
@@ -44,11 +46,18 @@ var (
 		authEapTLS:        {},
 		authEapTtlsEapTLS: {},
 	}
+	requireCACertificate = map[string]struct{}{
+		authTeapEapTLS: {},
+	}
+	requireDeviceOrUserCertificate = map[string]struct{}{
+		authTeapEapTLS: {},
+	}
 	requireTunneledCACertificate = map[string]struct{}{
 		authEapTtlsPAP:         {},
 		authEapTtlsEapMsCHAPv2: {},
 		authEapTtlsEapTLS:      {},
 		authPeapMsCHAPv2:       {},
+		authTeapEapTLS:         {},
 	}
 )
 
@@ -58,6 +67,10 @@ var (
 	password             string
 	anonymousUsername    string
 	clientCertificate    string
+	deviceCertificate    string
+	userCertificate      string
+	deviceIdentity       string
+	userIdentity         string
 	caCertificate        string
 	tunnelCACertificate  string
 	tlsVersion           string
@@ -108,6 +121,10 @@ func init() {
 	authCmd.PersistentFlags().StringVar(&password, "password", "", "Password")
 	authCmd.PersistentFlags().StringVar(&anonymousUsername, "anonymous-username", "anonymous", "EAP anonymous username")
 	authCmd.PersistentFlags().StringVar(&clientCertificate, "client-cert", "", "Client certificate")
+	authCmd.PersistentFlags().StringVar(&deviceCertificate, "device-cert", "", "TEAP device (machine) certificate")
+	authCmd.PersistentFlags().StringVar(&userCertificate, "user-cert", "", "TEAP user certificate")
+	authCmd.PersistentFlags().StringVar(&deviceIdentity, "device-identity", "", "TEAP device identity (default host/ and the certificate DNS name)")
+	authCmd.PersistentFlags().StringVar(&userIdentity, "user-identity", "", "TEAP user identity (default the certificate UPN)")
 	authCmd.PersistentFlags().StringVar(&caCertificate, "ca-cert", "", "CA certificate")
 	authCmd.PersistentFlags().StringVar(&tunnelCACertificate, "tunnel-ca-cert", "", "tunnel CA certificate")
 	authCmd.PersistentFlags().StringVar(&tlsVersion, "tls-version", "1.2", "TLS version underlying TLS-based protocols")
@@ -166,7 +183,7 @@ func internalAuth(session *radius.AuthenticationSession, serverName, protocol st
 	case authPAP:
 		return session.PAP(username, password)
 	}
-	if !strings.HasPrefix(protocol, "eap-") && !strings.HasPrefix(protocol, "peap-") && protocol != authMabEapMd5 {
+	if !strings.HasPrefix(protocol, "eap-") && !strings.HasPrefix(protocol, "peap-") && !strings.HasPrefix(protocol, "teap-") && protocol != authMabEapMd5 {
 		return fmt.Errorf("unknown protocol picked: %s", protocol)
 	}
 	if protocol == authMabEapMd5 {
@@ -230,9 +247,40 @@ func eapAuth(session *eap.Session, serverName, protocol string) error {
 		}
 		ts := eap.NewSession(peap, anonymousUsername, true)
 		return ts.MsCHAPv2(username, password)
+	case authTeapEapTLS:
+		creds, err := teapCredentials()
+		if err != nil {
+			return err
+		}
+		eapteap, err := eap.CreateTEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsTunnelKeyLogFilename, tlsSkipHostnameCheck)
+		if err != nil {
+			return err
+		}
+		return eapteap.Authenticate(creds, caCertificate, tlsAuthenticationKeyLogFilename)
 	default:
 		return fmt.Errorf("unknown protocol picked: %s", protocol)
 	}
+}
+
+// teapCredentials lists the device before the user, the one offered first when
+// the server does not ask for an identity type
+func teapCredentials() ([]eap.TEAPCredential, error) {
+	var creds []eap.TEAPCredential
+	if deviceCertificate != "" {
+		c, err := eap.NewTEAPCredential(teap.IdentityTypeMachine, deviceCertificate, deviceIdentity)
+		if err != nil {
+			return nil, fmt.Errorf("invalid device credential: %w", err)
+		}
+		creds = append(creds, c)
+	}
+	if userCertificate != "" {
+		c, err := eap.NewTEAPCredential(teap.IdentityTypeUser, userCertificate, userIdentity)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user credential: %w", err)
+		}
+		creds = append(creds, c)
+	}
+	return creds, nil
 }
 
 func prerun(cmd *cobra.Command, args []string) error {
@@ -263,6 +311,12 @@ func missingValues(protocol string) (mv []string) {
 	}
 	if _, ok := requireClientAndCACertificate[protocol]; ok && caCertificate == "" {
 		mv = append(mv, "ca-cert")
+	}
+	if _, ok := requireCACertificate[protocol]; ok && caCertificate == "" {
+		mv = append(mv, "ca-cert")
+	}
+	if _, ok := requireDeviceOrUserCertificate[protocol]; ok && deviceCertificate == "" && userCertificate == "" {
+		mv = append(mv, "device-cert or user-cert")
 	}
 	if _, ok := requireTunneledCACertificate[protocol]; ok && tunnelCACertificate == "" {
 		mv = append(mv, "tunnel-ca-cert")

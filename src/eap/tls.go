@@ -22,6 +22,10 @@ const (
 	eapMasterKeyLabel = "client EAP encryption"
 )
 
+// errNoCommitment is an empty request where a TLS 1.3 server sends its
+// commitment message, as hostapd does for EAP-TLS inside TEAP
+var errNoCommitment = errors.New("eap tls: server sent no commitment message")
+
 func exportKeyingMaterial(client *tls.Conn, label string) (recv, send []byte, err error) {
 	connState := client.ConnectionState()
 	km, err := connState.ExportKeyingMaterial(label, nil, 128)
@@ -37,9 +41,16 @@ type TLS struct {
 	rootCAs           *x509.CertPool
 	tlsVersion        uint16
 	packetType        Type
+	packetVersion     eaptls.Flags
 	readBuffer        []byte
 	readMore          bool
 	skipHostnameCheck bool
+	// serverName overrides the RADIUS server address as the name the server
+	// certificate is checked for
+	serverName string
+	// commitmentOptional accepts the end of a TLS 1.3 handshake without the
+	// commitment message, which TEAP reports with its own TLVs instead
+	commitmentOptional bool
 }
 
 func CreateTLS(session *Session, caCert, tlsVersion string, skipHostnameCheck bool) (*TLS, error) {
@@ -79,58 +90,7 @@ func internalCreateTLS(session *Session, caCert, tlsVersion string, skipHostname
 }
 
 func (tt *TLS) Authenticate(certpath, keyLogFilename string) error {
-	cert, err := tls.LoadX509KeyPair(certpath, certpath)
-	if err != nil {
-		return err
-	}
-	h, _, err := net.SplitHostPort(tt.RemoteAddr().String())
-	if err != nil {
-		return err
-	}
-	tlsConfig := &tls.Config{
-		RootCAs:               tt.rootCAs,
-		Certificates:          []tls.Certificate{cert},
-		ServerName:            h,
-		MinVersion:            tt.tlsVersion,
-		MaxVersion:            tt.tlsVersion,
-		InsecureSkipVerify:    tt.skipHostnameCheck,
-		VerifyPeerCertificate: tt.verifyCertificateChain,
-		Renegotiation:         tls.RenegotiateNever,
-	}
-	if keyLogFilename != "" {
-		f, err := os.OpenFile(keyLogFilename, os.O_CREATE|os.O_WRONLY, 0600)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			err := f.Close()
-			if err != nil {
-				slog.Error("failed to close key log file",
-					"error", err,
-				)
-			}
-		}()
-		tlsConfig.KeyLogWriter = f
-	}
-	tc := tls.Client(tt, tlsConfig)
-	err = tc.Handshake()
-	if err != nil {
-		return err
-	}
-
-	if tt.tlsVersion == tls.VersionTLS13 {
-		buff := make([]byte, 16)
-		blen, err := tc.Read(buff)
-		if err != nil {
-			return err
-		}
-		if blen != 1 || buff[0] != 0x00 {
-			return fmt.Errorf("invalid success byte for EAP-TLS")
-		}
-	}
-
-	wd := tt.newDatagram(&Content{Type: tt.packetType, Data: []byte{0}})
-	_, err = tt.WriteDatagram(wd)
+	tc, err := tt.handshake(certpath, keyLogFilename)
 	if err != nil {
 		return err
 	}
@@ -151,6 +111,80 @@ func (tt *TLS) Authenticate(certpath, keyLogFilename string) error {
 	// extract key material
 	tt.RecvKey, tt.SendKey, err = exportKeyingMaterial(tc, eapMasterKeyLabel)
 	return err
+}
+
+// handshake authenticates with the client certificate and acknowledges the
+// last message of the server, leaving the outcome to be read by the caller
+func (tt *TLS) handshake(certpath, keyLogFilename string) (*tls.Conn, error) {
+	cert, err := tls.LoadX509KeyPair(certpath, certpath)
+	if err != nil {
+		return nil, err
+	}
+	h, _, err := net.SplitHostPort(tt.RemoteAddr().String())
+	if err != nil {
+		return nil, err
+	}
+	if tt.serverName != "" {
+		h = tt.serverName
+	}
+	tlsConfig := &tls.Config{
+		RootCAs:               tt.rootCAs,
+		Certificates:          []tls.Certificate{cert},
+		ServerName:            h,
+		MinVersion:            tt.tlsVersion,
+		MaxVersion:            tt.tlsVersion,
+		InsecureSkipVerify:    tt.skipHostnameCheck,
+		VerifyPeerCertificate: tt.verifyCertificateChain,
+		Renegotiation:         tls.RenegotiateNever,
+	}
+	if keyLogFilename != "" {
+		// appended to, as TEAP runs one handshake per credential
+		f, err := os.OpenFile(keyLogFilename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			err := f.Close()
+			if err != nil {
+				slog.Error("failed to close key log file",
+					"error", err,
+				)
+			}
+		}()
+		tlsConfig.KeyLogWriter = f
+	}
+	tc := tls.Client(tt, tlsConfig)
+	err = tc.Handshake()
+	if err != nil {
+		return nil, err
+	}
+
+	if tt.tlsVersion == tls.VersionTLS13 {
+		buff := make([]byte, 16)
+		blen, err := tc.Read(buff)
+		if errors.Is(err, errNoCommitment) && tt.commitmentOptional {
+			blen, buff[0], err = 1, 0x00, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if blen != 1 || buff[0] != 0x00 {
+			return nil, fmt.Errorf("invalid success byte for EAP-TLS")
+		}
+	}
+
+	wd := tt.newDatagram(tt.ackContent())
+	_, err = tt.WriteDatagram(wd)
+	if err != nil {
+		return nil, err
+	}
+	return tc, nil
+}
+
+// ackContent is an empty message, acknowledging a fragment or a final
+// handshake message of the server
+func (tt *TLS) ackContent() *Content {
+	return &Content{Type: tt.packetType, Data: []byte{byte(tt.packetVersion)}}
 }
 
 func (tt *TLS) Read(b []byte) (int, error) {
@@ -179,7 +213,7 @@ func (tt *TLS) Read(b []byte) (int, error) {
 				}
 				return n, nil
 			}
-			wd := tt.newDatagram(&Content{Type: tt.packetType, Data: []byte{0}})
+			wd := tt.newDatagram(tt.ackContent())
 			err := tt.WriteReadDatagram(wd, rd)
 			if err != nil {
 				return n, err
@@ -200,9 +234,22 @@ func (tt *TLS) Read(b []byte) (int, error) {
 		if rd.Content.Type != tt.packetType {
 			return n, fmt.Errorf("eap tls: server sent a packet of unexpected EAP type")
 		}
-		data := eaptls.CreateDataFromBuffer(rd.Content.Data)
+		data, err := eaptls.CreateDataFromBuffer(rd.Content.Data)
+		if err != nil {
+			return n, fmt.Errorf("eap tls: %w", err)
+		}
+		if tt.packetType == TypeTEAP && data.Flags&eaptls.FlagsOuterTLVLength != 0 {
+			var err error
+			data.Data, _, err = splitOuterTLVs(data.Data)
+			if err != nil {
+				return n, err
+			}
+		}
 		tt.readMore = data.Flags&eaptls.FlagsMore != 0
 		tt.readBuffer = data.Data
+		if len(data.Data) == 0 && !tt.readMore && n == 0 && tt.commitmentOptional {
+			return n, errNoCommitment
+		}
 
 		cn := copy(b, tt.readBuffer)
 		b = b[cn:]
@@ -216,7 +263,11 @@ func (tt *TLS) Read(b []byte) (int, error) {
 func (tt *TLS) Write(b []byte) (int, error) {
 	nt := 0
 	s := tt.Tunnel.MaxDataSize() - 6
-	f := eaptls.FlagsLength
+	f := eaptls.FlagsLength | tt.packetVersion
+	// TEAP forbids the message length on messages sent whole
+	if tt.packetType == TypeTEAP && len(b) <= s {
+		f = tt.packetVersion
+	}
 	l := len(b)
 	for len(b) > 0 {
 		rem := len(b) > s
@@ -236,7 +287,7 @@ func (tt *TLS) Write(b []byte) (int, error) {
 		}
 		nt += n
 		b = b[len(d):]
-		f = 0
+		f = tt.packetVersion
 
 		if rem {
 			rd := &Datagram{}
@@ -248,7 +299,7 @@ func (tt *TLS) Write(b []byte) (int, error) {
 				rd.Content == nil ||
 				rd.Content.Type != tt.packetType ||
 				len(rd.Content.Data) != 1 ||
-				rd.Content.Data[0] != 0 {
+				eaptls.Flags(rd.Content.Data[0])&^eaptls.FlagsVersionMask != 0 {
 				return nt, fmt.Errorf("eap tls: expected empty request to send fragments")
 			}
 		}

@@ -17,7 +17,10 @@ Only hold "Data" section (anything after first `Type`)
 */
 package tls
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"errors"
+)
 
 type Data struct {
 	Flags            Flags
@@ -34,20 +37,33 @@ const (
 	FlagsTLSMessageLength
 )
 
-func CreateDataFromBuffer(b []byte) *Data {
+// TEAP reuses the fourth flag to announce Outer TLVs and carries its version
+// in the lowest bits
+const (
+	FlagsOuterTLVLength = FlagsTLSMessageLength
+	FlagsVersionMask    = Flags(0x07)
+)
+
+func CreateDataFromBuffer(b []byte) (*Data, error) {
+	if len(b) < 1 {
+		return nil, errors.New("tls data: missing flags")
+	}
 	f := Flags(b[0])
 	if f&FlagsLength != 0 {
+		if len(b) < 5 {
+			return nil, errors.New("tls data: missing message length")
+		}
 		return &Data{
 			Flags:            f,
 			TLSMessageLength: binary.BigEndian.Uint32(b[1:5]),
 			Data:             b[5:],
-		}
+		}, nil
 	} else {
 
 		return &Data{
 			Flags: f,
 			Data:  b[1:],
-		}
+		}, nil
 	}
 }
 

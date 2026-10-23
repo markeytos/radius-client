@@ -109,6 +109,10 @@ func (s *Session) ReadDatagram(rd *Datagram) (int, error) {
 		return int(n), s.lastErr
 	}
 	s.lastReadDatagram = rd
+	// the response carries the identifier of the request it answers
+	if rd.Header.Code == CodeRequest {
+		s.identifier = rd.Header.Identifier
+	}
 	s.lastAction = sessionLastActionReadDatagram
 	return int(n), nil
 }
