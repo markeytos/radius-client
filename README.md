@@ -172,14 +172,14 @@ additional attributes to the server, and expects three attributes from the serve
 in the `Access-Accept` packet.
 
 A tunnel attribute can carry an [RFC 2868](https://datatracker.ietf.org/doc/html/rfc2868)
-tag, written before the value, so a VLAN returned to the NAS can be checked
-exactly. `Egress-VLANID` takes `tagged:<vlan>` or `untagged:<vlan>`.
+tag on its name, so a VLAN returned to the NAS can be checked exactly.
+`Egress-VLANID` takes `tagged:<vlan>` or `untagged:<vlan>`.
 
 ```bash
 $RADIUS_AUTH_COMMAND pap --username test_user --password test_password \
-    --attrs-to-recv Tunnel-Type:1:Virtual LAN \
-    --attrs-to-recv Tunnel-Medium-Type:1:802 \
-    --attrs-to-recv Tunnel-Private-Group-ID:1:20
+    --attrs-to-recv Tunnel-Type#1:Virtual LAN \
+    --attrs-to-recv Tunnel-Medium-Type#1:802 \
+    --attrs-to-recv Tunnel-Private-Group-ID#1:20
 ```
 
 You can view all attributes and their values can be defined in this [document](./RADIUS_ATTRIBUTES.md).

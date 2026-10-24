@@ -46,55 +46,36 @@ const (
 	egressVLANUntagged = 0x32
 )
 
-// splitOptionalTunnelTag separates a leading RFC 2868 tag from a CLI value.
-// The tag is a decimal integer from 0 to 31 followed by a colon, as in
-// "1:20". A value with no such prefix is untagged.
-func splitOptionalTunnelTag(v string) (tag byte, rest string, tagged bool, err error) {
-	colon := strings.IndexByte(v, ':')
-	if colon <= 0 {
-		return 0, v, false, nil
-	}
-	n, convErr := strconv.ParseUint(v[:colon], 10, 8)
-	if convErr != nil || n > maxTunnelTag {
-		return 0, v, false, nil
-	}
-	rest = v[colon+1:]
-	if rest == "" {
-		return 0, "", false, fmt.Errorf("missing value after tunnel tag %d", n)
-	}
-	return byte(n), rest, true, nil
-}
-
-func serializeTunnelEnumAttribute(t AttributeType, v string) (*Attribute, error) {
-	tag, rest, _, err := splitOptionalTunnelTag(v)
-	if err != nil {
+func serializeTunnelEnumAttribute(k AttributeKey, v string) (*Attribute, error) {
+	if err := tunnelTagInRange(k); err != nil {
 		return nil, err
 	}
-	a := newEmptyAttribute(t, 4)
-	if err := ParseAttributeEnumData(a.Value, t, rest); err != nil {
+	// Checked on the full parsed number, before it is narrowed to the 24-bit
+	// enum. A value such as 2^32+13 would otherwise wrap to Virtual LAN.
+	if n, err := strconv.ParseUint(v, 10, 64); err == nil && n > 0xFFFFFF {
+		return nil, fmt.Errorf("%s value %s does not fit in 24 bits; set the tag on the name, for example %s#1:<value>", k.Type.String(), v, k.Type.String())
+	}
+	a := newEmptyAttribute(k.Type, 4)
+	if err := ParseAttributeEnumData(a.Value, k.Type, v); err != nil {
 		return nil, err
 	}
-	// The enum occupies the low 24 bits. A value that spills into the tag
-	// octet is not a legal RFC 2868 tunnel type or medium type.
 	if a.Value[0] != 0 {
-		return nil, fmt.Errorf("%s value does not fit in 24 bits: %s", t.String(), rest)
+		return nil, fmt.Errorf("%s value %s does not fit in 24 bits; set the tag on the name, for example %s#1:Virtual LAN", k.Type.String(), v, k.Type.String())
 	}
-	a.Value[0] = tag
+	if k.HasTunnelTag {
+		a.Value[0] = k.TunnelTag
+	}
 	return a, nil
 }
 
-func serializeTunnelPrivateGroupId(v string) (*Attribute, error) {
-	tag, rest, tagged, err := splitOptionalTunnelTag(v)
-	if err != nil {
+func serializeTunnelPrivateGroupId(k AttributeKey, v string) (*Attribute, error) {
+	if err := tunnelTagInRange(k); err != nil {
 		return nil, err
 	}
-	if !tagged {
+	if !k.HasTunnelTag {
 		return newAttribute(AttributeTypeTunnelPrivateGroupId, []byte(v)), nil
 	}
-	b := make([]byte, 1+len(rest))
-	b[0] = tag
-	copy(b[1:], rest)
-	return newAttribute(AttributeTypeTunnelPrivateGroupId, b), nil
+	return newTaggedStringAttribute(AttributeTypeTunnelPrivateGroupId, k.TunnelTag, v)
 }
 
 // splitEgressIndication separates an RFC 4675 indication from a CLI value.
@@ -102,14 +83,12 @@ func serializeTunnelPrivateGroupId(v string) (*Attribute, error) {
 // unchanged so an Egress-VLAN-Name written without a prefix keeps its
 // previous encoding.
 func splitEgressIndication(v string) (tag byte, rest string, indicated bool, err error) {
-	switch {
-	case strings.HasPrefix(v, "tagged:"):
-		rest = strings.TrimPrefix(v, "tagged:")
+	var found bool
+	if rest, found = strings.CutPrefix(v, "tagged:"); found {
 		tag = egressVLANTagged
-	case strings.HasPrefix(v, "untagged:"):
-		rest = strings.TrimPrefix(v, "untagged:")
+	} else if rest, found = strings.CutPrefix(v, "untagged:"); found {
 		tag = egressVLANUntagged
-	default:
+	} else {
 		return 0, v, false, nil
 	}
 	if rest == "" {
@@ -146,8 +125,24 @@ func serializeEgressVlanName(v string) (*Attribute, error) {
 	if !indicated {
 		return newAttribute(AttributeTypeEgressVlanName, []byte(v)), nil
 	}
-	b := make([]byte, 1+len(name))
-	b[0] = tag
-	copy(b[1:], name)
-	return newAttribute(AttributeTypeEgressVlanName, b), nil
+	return newTaggedStringAttribute(AttributeTypeEgressVlanName, tag, name)
+}
+
+func tunnelTagInRange(k AttributeKey) error {
+	if k.HasTunnelTag && k.TunnelTag > maxTunnelTag {
+		return fmt.Errorf("invalid tunnel tag %d", k.TunnelTag)
+	}
+	return nil
+}
+
+// newTaggedStringAttribute prefixes a one-byte tag. The tag counts toward the
+// 253-byte attribute limit, so a value that was legal on its own can become
+// too long once the tag is added. That is an error, same as a vendor attribute
+// that does not fit, rather than a panic from newAttribute.
+func newTaggedStringAttribute(t AttributeType, tag byte, rest string) (*Attribute, error) {
+	n := 1 + len(rest)
+	if n > maxAttributeLen {
+		return nil, fmt.Errorf("value of %s too big: %d bytes", t.String(), n)
+	}
+	return newAttribute(t, append([]byte{tag}, rest...)), nil
 }

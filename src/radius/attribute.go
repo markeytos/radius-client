@@ -30,10 +30,18 @@ const (
 // AttributeKey identifies an attribute to serialize. All vendor specific
 // attributes share a single attribute type, so the vendor ID and vendor type
 // are what tell them apart. Both are zero for every other attribute.
+//
+// TunnelTag is an RFC 2868 tag, written on the attribute name as in
+// Tunnel-Private-Group-ID#1. HasTunnelTag distinguishes an explicit tag,
+// including zero, from a tag that was left off. Tunnel-Type and
+// Tunnel-Medium-Type store a tag of zero as left off, because both forms
+// encode with a zero tag octet.
 type AttributeKey struct {
-	Type       AttributeType
-	VendorId   VendorId
-	VendorType VendorType
+	Type         AttributeType
+	VendorId     VendorId
+	VendorType   VendorType
+	TunnelTag    byte
+	HasTunnelTag bool
 }
 
 type AttributeMap map[AttributeKey][]string
@@ -212,13 +220,13 @@ func serializeAttributeMap(attrMap AttributeMap) ([]*Attribute, error) {
 				}
 				attrs = append(attrs, a)
 			case AttributeTypeTunnelType, AttributeTypeTunnelMediumType:
-				a, err := serializeTunnelEnumAttribute(t, v)
+				a, err := serializeTunnelEnumAttribute(k, v)
 				if err != nil {
 					return attrs, err
 				}
 				attrs = append(attrs, a)
 			case AttributeTypeTunnelPrivateGroupId:
-				a, err := serializeTunnelPrivateGroupId(v)
+				a, err := serializeTunnelPrivateGroupId(k, v)
 				if err != nil {
 					return attrs, err
 				}
@@ -445,15 +453,43 @@ const (
 // AttributeKeyFromString resolves an attribute label to the key identifying
 // the attribute. Vendor specific attributes are addressed either by the name
 // of the vendor attribute, e.g. `Fortinet-Group-Name`, or generically as
-// `Vendor-Specific:<vendor ID>:<vendor type>`.
+// `Vendor-Specific:<vendor ID>:<vendor type>`. A tunnel attribute may carry
+// an RFC 2868 tag as a # suffix, e.g. `Tunnel-Private-Group-ID#1`.
 func AttributeKeyFromString(label string) (AttributeKey, error) {
-	if k, ok := vendorAttributeKeyFromLabel(label); ok {
+	name, tagText, hasTag := strings.Cut(label, "#")
+	k, err := attributeKeyFromName(name)
+	if err != nil {
+		return AttributeKey{}, err
+	}
+	if !hasTag {
 		return k, nil
 	}
-	if strings.HasPrefix(label, string(AttributeTypeLabelVendorSpecific)+":") {
-		return vendorAttributeKeyFromGenericLabel(label)
+	if k.Type != AttributeTypeTunnelType &&
+		k.Type != AttributeTypeTunnelMediumType &&
+		k.Type != AttributeTypeTunnelPrivateGroupId {
+		return AttributeKey{}, fmt.Errorf("%s does not take a tunnel tag", name)
 	}
-	t, err := AttributeTypeFromString(label)
+	n, err := strconv.ParseUint(tagText, 10, 8)
+	if err != nil || n > maxTunnelTag {
+		return AttributeKey{}, fmt.Errorf("invalid tunnel tag %q", tagText)
+	}
+	// A zero tag on a tunnel enum is the same encoding as leaving the tag off.
+	if n == 0 && k.Type != AttributeTypeTunnelPrivateGroupId {
+		return k, nil
+	}
+	k.TunnelTag = byte(n)
+	k.HasTunnelTag = true
+	return k, nil
+}
+
+func attributeKeyFromName(name string) (AttributeKey, error) {
+	if k, ok := vendorAttributeKeyFromLabel(name); ok {
+		return k, nil
+	}
+	if strings.HasPrefix(name, string(AttributeTypeLabelVendorSpecific)+":") {
+		return vendorAttributeKeyFromGenericLabel(name)
+	}
+	t, err := AttributeTypeFromString(name)
 	if err != nil {
 		return AttributeKey{}, err
 	}

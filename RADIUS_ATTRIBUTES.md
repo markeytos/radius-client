@@ -135,19 +135,21 @@ first value octet of `Tunnel-Type`, `Tunnel-Medium-Type`, and
 `Tunnel-Private-Group-ID`. The tag is a number from 0 to 31 and groups the
 attributes that describe one tunnel. Tag 0 means the tag is unused.
 
-Write the tag before the value. Omit it for an unused tag:
+Write the tag as a `#` suffix on the attribute name. The value after the
+colon is then the whole value, so a group id of `10:20` is not read as a tag:
 
 ```sh
---attrs-to-recv Tunnel-Type:1:Virtual LAN \
---attrs-to-recv Tunnel-Medium-Type:1:802 \
---attrs-to-recv Tunnel-Private-Group-ID:1:20
+--attrs-to-recv Tunnel-Type#1:Virtual LAN \
+--attrs-to-recv Tunnel-Medium-Type#1:802 \
+--attrs-to-recv Tunnel-Private-Group-ID#1:20
 ```
 
 `Tunnel-Private-Group-ID:20` is the string `20` with no tag octet. That is
 the unused-tag form, because the first byte of `20` is greater than 0x1F.
-`Tunnel-Private-Group-ID:0:20` is the same string with an explicit zero tag
+`Tunnel-Private-Group-ID#0:20` is the same string with an explicit zero tag
 octet, which is what a server sends when it includes the tag and sets it to
-zero. A number greater than 31 is not a tag, so `32:20` is the whole string.
+zero. `Tunnel-Private-Group-ID:10:20` is the literal string `10:20`. A tag
+above 31 is an error.
 
 ## Egress VLANs
 
@@ -160,13 +162,15 @@ plus a VLAN id from 0 to 4095:
 --attrs-to-recv Egress-VLANID:untagged:100
 ```
 
-`Egress-VLAN-Name` takes the same prefix. Without it, the name is sent as
-the raw string, which is the encoding this client used before the prefix
-existed:
+`Egress-VLAN-Name` takes the same prefix. RFC 4675 requires that indication,
+so use it when sending or expecting a name. A name with no prefix is a legacy
+form this client still sends unchanged. A compliant NAS reads the first byte
+of that string as the indication, which makes a name such as `1st-floor` look
+like a tagged VLAN called `st-floor`.
 
 ```sh
 --attrs-to-recv Egress-VLAN-Name:tagged:Engineering
---attrs-to-send Egress-VLAN-Name:Engineering
+--attrs-to-send Egress-VLAN-Name:untagged:Engineering
 ```
 
 ## Enum values
