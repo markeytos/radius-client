@@ -41,6 +41,14 @@ func TestParseAttributes(t *testing.T) {
 		{"User-Name:user@example.com", radius.AttributeKey{Type: radius.AttributeTypeUserName}, "user@example.com"},
 		{"NAS-Identifier:fake-router", radius.AttributeKey{Type: radius.AttributeTypeNasIdentifier}, "fake-router"},
 		{"Filter-Id:20", radius.AttributeKey{Type: radius.AttributeTypeFilterId}, "20"},
+		// the tag is a suffix on the name, so a colon in the value stays part of the value
+		{"Tunnel-Private-Group-ID#1:20", radius.AttributeKey{Type: radius.AttributeTypeTunnelPrivateGroupId, TunnelTag: 1, HasTunnelTag: true}, "20"},
+		{"Tunnel-Private-Group-ID#01:20", radius.AttributeKey{Type: radius.AttributeTypeTunnelPrivateGroupId, TunnelTag: 1, HasTunnelTag: true}, "20"},
+		{"Tunnel-Private-Group-ID:10:20", radius.AttributeKey{Type: radius.AttributeTypeTunnelPrivateGroupId}, "10:20"},
+		{"Tunnel-Type#1:Virtual LAN", radius.AttributeKey{Type: radius.AttributeTypeTunnelType, TunnelTag: 1, HasTunnelTag: true}, "Virtual LAN"},
+		// a zero tag on a tunnel enum is the same key as leaving the tag off
+		{"Tunnel-Type#0:Virtual LAN", radius.AttributeKey{Type: radius.AttributeTypeTunnelType}, "Virtual LAN"},
+		{"Egress-VLANID:tagged:100", radius.AttributeKey{Type: radius.AttributeTypeEgressVlanId}, "tagged:100"},
 	}
 
 	for _, test := range tests {
@@ -70,6 +78,9 @@ func TestParseInvalidAttributes(t *testing.T) {
 		"Vendor-Specific:0:1:0011",
 		"Not-An-Attribute:value",
 		"Cisco-AVPair:shell\tpriv-lvl=15",
+		"Tunnel-Type#33:Virtual LAN",
+		"Tunnel-Private-Group-ID#32:20",
+		"Filter-Id#1:20",
 	}
 	for _, e := range badEntries {
 		if _, err := parseAttributes([]string{e}); err == nil {
@@ -95,5 +106,29 @@ func TestParseDuplicateAttributes(t *testing.T) {
 	vs := m[ciscoAVPairKey]
 	if len(vs) != 2 || vs[0] != "shell:priv-lvl=15" || vs[1] != "ip:addr-pool=guest" {
 		t.Fatalf("incorrect values parsed.\nexpected: \t[shell:priv-lvl=15 ip:addr-pool=guest]\ngot: \t\t%v", vs)
+	}
+}
+
+// Forms that encode to the same attribute are duplicates. An explicit zero
+// tag on a group id is not one of those: it is a different value on the wire
+// from a group id with the tag left off.
+func TestParseDuplicateTunnelTags(t *testing.T) {
+	duplicates := [][]string{
+		{"Tunnel-Type:Virtual LAN", "Tunnel-Type#0:Virtual LAN"},
+		{"Tunnel-Private-Group-ID#1:20", "Tunnel-Private-Group-ID#01:20"},
+	}
+	for _, entries := range duplicates {
+		if _, err := parseAttributes(entries); err == nil {
+			t.Fatalf("expected a duplicate error for %v", entries)
+		}
+	}
+
+	entries := []string{"Tunnel-Private-Group-ID:20", "Tunnel-Private-Group-ID#0:20"}
+	m, err := parseAttributes(entries)
+	if err != nil {
+		t.Fatalf("explicit zero tag was treated as a duplicate: %v", err)
+	}
+	if len(m) != 2 {
+		t.Fatalf("expected two distinct group ids, got %+v", m)
 	}
 }

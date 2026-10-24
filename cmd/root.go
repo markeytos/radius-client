@@ -136,11 +136,12 @@ Each entry must be of the format
 
 func parseAttributes(attrs []string) (radius.AttributeMap, error) {
 	// A vendor specific attribute addressed by number carries the vendor ID and
-	// the vendor type in its label, every other label is a single word. The
-	// value is therefore whatever follows, and may hold colons and equals signs
-	// of its own, as a Cisco AVPair does.
+	// the vendor type in its label. A tunnel attribute may carry an RFC 2868
+	// tag as a # suffix on its name, for example Tunnel-Private-Group-ID#1.
+	// Every other label is a single word. The value is whatever follows, and
+	// may hold colons and equals signs of its own, as a Cisco AVPair does.
 	vsa := regexp.QuoteMeta(string(radius.AttributeTypeLabelVendorSpecific))
-	r := regexp.MustCompile(`^(?P<Label>` + vsa + `:[0-9]+:[0-9]+|[A-Za-z0-9_-]+):(?P<Value>[\x20-\x7E]+)$`)
+	r := regexp.MustCompile(`^(?P<Label>` + vsa + `:[0-9]+:[0-9]+|[A-Za-z0-9_-]+(?:#[0-9]+)?):(?P<Value>[\x20-\x7E]+)$`)
 
 	attrMap := make(radius.AttributeMap)
 
