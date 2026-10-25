@@ -198,7 +198,7 @@ func eapAuth(session *eap.Session, serverName, protocol string) error {
 		if err != nil {
 			return err
 		}
-		return eaptls.Authenticate(clientCertificate, tlsAuthenticationKeyLogFilename)
+		return eaptls.Authenticate(serverName, clientCertificate, tlsAuthenticationKeyLogFilename)
 	case authEapTtlsPAP:
 		eapttls, err := eap.CreateTTLS(session, tunnelCACertificate, tlsVersion, serverName, tlsTunnelKeyLogFilename, tlsSkipHostnameCheck)
 		if err != nil {
@@ -222,7 +222,7 @@ func eapAuth(session *eap.Session, serverName, protocol string) error {
 		if err != nil {
 			return err
 		}
-		return eaptls.Authenticate(clientCertificate, tlsAuthenticationKeyLogFilename)
+		return eaptls.Authenticate(serverName, clientCertificate, tlsAuthenticationKeyLogFilename)
 	case authPeapMsCHAPv2:
 		peap, err := eap.CreatePEAP(session, tunnelCACertificate, tlsVersion, serverName, tlsTunnelKeyLogFilename, tlsSkipHostnameCheck)
 		if err != nil {
