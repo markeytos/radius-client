@@ -78,19 +78,15 @@ func internalCreateTLS(session *Session, caCert, tlsVersion string, skipHostname
 	}, nil
 }
 
-func (tt *TLS) Authenticate(certpath, keyLogFilename string) error {
+func (tt *TLS) Authenticate(serverName, certpath, keyLogFilename string) error {
 	cert, err := tls.LoadX509KeyPair(certpath, certpath)
-	if err != nil {
-		return err
-	}
-	h, _, err := net.SplitHostPort(tt.RemoteAddr().String())
 	if err != nil {
 		return err
 	}
 	tlsConfig := &tls.Config{
 		RootCAs:               tt.rootCAs,
 		Certificates:          []tls.Certificate{cert},
-		ServerName:            h,
+		ServerName:            serverName,
 		MinVersion:            tt.tlsVersion,
 		MaxVersion:            tt.tlsVersion,
 		InsecureSkipVerify:    tt.skipHostnameCheck,
