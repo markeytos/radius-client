@@ -32,6 +32,26 @@ func exportKeyingMaterial(client *tls.Conn, label string) (recv, send []byte, er
 	return
 }
 
+// exportEAPTLSKeyingMaterial derives the MSK for EAP-TLS.
+// TLS 1.3 uses the label and Type-Code context specified in RFC 9190 section 2.3;
+// TLS 1.2 uses the RFC 5216 exporter parameters.
+func exportEAPTLSKeyingMaterial(client *tls.Conn) (recv, send []byte, err error) {
+	state := client.ConnectionState()
+	label := eapMasterKeyLabel
+	var context []byte
+
+	if state.Version == tls.VersionTLS13 {
+		label = "EXPORTER_EAP_TLS_Key_Material"
+		context = []byte{byte(TypeTLS)}
+	}
+
+	km, err := state.ExportKeyingMaterial(label, context, 128)
+	if err != nil {
+		return nil, nil, err
+	}
+	return km[:32], km[32:64], nil
+}
+
 type TLS struct {
 	*Session
 	rootCAs           *x509.CertPool
@@ -78,19 +98,15 @@ func internalCreateTLS(session *Session, caCert, tlsVersion string, skipHostname
 	}, nil
 }
 
-func (tt *TLS) Authenticate(certpath, keyLogFilename string) error {
+func (tt *TLS) Authenticate(serverName, certpath, keyLogFilename string) error {
 	cert, err := tls.LoadX509KeyPair(certpath, certpath)
-	if err != nil {
-		return err
-	}
-	h, _, err := net.SplitHostPort(tt.RemoteAddr().String())
 	if err != nil {
 		return err
 	}
 	tlsConfig := &tls.Config{
 		RootCAs:               tt.rootCAs,
 		Certificates:          []tls.Certificate{cert},
-		ServerName:            h,
+		ServerName:            serverName,
 		MinVersion:            tt.tlsVersion,
 		MaxVersion:            tt.tlsVersion,
 		InsecureSkipVerify:    tt.skipHostnameCheck,
@@ -149,7 +165,7 @@ func (tt *TLS) Authenticate(certpath, keyLogFilename string) error {
 	}
 
 	// extract key material
-	tt.RecvKey, tt.SendKey, err = exportKeyingMaterial(tc, eapMasterKeyLabel)
+	tt.RecvKey, tt.SendKey, err = exportEAPTLSKeyingMaterial(tc)
 	return err
 }
 
