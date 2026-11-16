@@ -610,7 +610,9 @@ func ParseAttributeEnumTunnelType(v string) (AttributeEnumTunnelType, error) {
 	case "Virtual LAN":
 		return AttributeEnumTunnelTypeVirtualLAN, nil
 	default:
-		i, err := strconv.ParseUint(v, 10, 0)
+		// 24 bits, not a full uint32: the high octet of the attribute is the
+		// RFC 2868 tag, so a value that does not fit here must not wrap into it.
+		i, err := strconv.ParseUint(v, 10, 24)
 		if err == nil {
 			return AttributeEnumTunnelType(i), nil
 		}
@@ -671,7 +673,9 @@ func ParseAttributeEnumTunnelMediumType(v string) (AttributeEnumTunnelMediumType
 	case "E.164 with NSAP subaddress":
 		return AttributeEnumTunnelMediumTypeE164WithNSAPSubaddress, nil
 	default:
-		i, err := strconv.ParseUint(v, 10, 0)
+		// 24 bits, not a full uint32: the high octet of the attribute is the
+		// RFC 2868 tag, so a value that does not fit here must not wrap into it.
+		i, err := strconv.ParseUint(v, 10, 24)
 		if err == nil {
 			return AttributeEnumTunnelMediumType(i), nil
 		}
